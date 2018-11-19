@@ -271,6 +271,9 @@ func (r *ReconcileIronicApi) deploymentForIronicApi(m *ironicv1alpha1.IronicApi)
                             VolumeSource: corev1.VolumeSource {
                                 ConfigMap: &corev1.ConfigMapVolumeSource {
                                     DefaultMode: &execMode,
+				                    LocalObjectReference: corev1.LocalObjectReference{
+					                    Name: "ironic-bin",
+				                    },
                                 },
                             },
                         },
@@ -279,7 +282,11 @@ func (r *ReconcileIronicApi) deploymentForIronicApi(m *ironicv1alpha1.IronicApi)
                             VolumeSource: corev1.VolumeSource {
                                 ConfigMap: &corev1.ConfigMapVolumeSource {
                                     DefaultMode: &readMode,
+				                    LocalObjectReference: corev1.LocalObjectReference{
+					                    Name: "ironic-etc",
+				                    },
                                 },
+
                             },
                         },
                         {
