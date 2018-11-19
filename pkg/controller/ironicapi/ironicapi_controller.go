@@ -5,6 +5,7 @@ import (
     "reflect"
 
 	ironicv1alpha1 "github.com/redhat-nfvpe/ironic-operator/pkg/apis/ironic/v1alpha1"
+    helpers "github.com/redhat-nfvpe/ironic-operator/pkg/helpers"
 
   	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -91,6 +92,23 @@ func (r *ReconcileIronicApi) Reconcile(request reconcile.Request) (reconcile.Res
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
+
+    // Check if the configmap already exists, if not create a new one
+    cm_found := &corev1.ConfigMap{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-bin", Namespace: instance.Namespace}, cm_found)
+    if err != nil && errors.IsNotFound(err) {
+        // define a new configmap
+        cm, _ := helpers.GetIronicBinConfigMap(instance)
+        reqLogger.Info("Creating a new ironic-bin configmap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
+        err = r.client.Create(context.TODO(), cm)
+        if err != nil {
+            reqLogger.Error(err, "failed to create a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
+            return reconcile.Result{}, err
+        }
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get ironic-bin ConfigMap")
+        return reconcile.Result{}, err
+    }
 
 	// Check if the deployment already exists, if not create a new one
 	found := &appsv1.Deployment{}
