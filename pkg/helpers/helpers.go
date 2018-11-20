@@ -15,9 +15,9 @@
 package helpers
 
 import (
-    "io/ioutil"
     "log"
     ironicv1alpha1 "github.com/redhat-nfvpe/ironic-operator/pkg/apis/ironic/v1alpha1"
+    packr "github.com/gobuffalo/packr"
 
     v1 "k8s.io/api/core/v1"
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,43 +25,45 @@ import (
 
 func GetIronicBinConfigMap(m *ironicv1alpha1.IronicApi) (*v1.ConfigMap, error) {
     // read all bin scripts
-    db_init, err := ioutil.ReadFile("files/db_init.py")
+    box := packr.NewBox("./files")
+
+    db_init, err := box.FindString("db_init.py")
     if err != nil {
         log.Fatal(err)
     }
-    db_sync, err := ioutil.ReadFile("files/db_sync.sh")
+    db_sync, err := box.FindString("db_sync.sh")
     if err != nil {
         log.Fatal(err)
     }
-    rabbit_init, err := ioutil.ReadFile("files/rabbit_init.sh")
+    rabbit_init, err := box.FindString("rabbit_init.sh")
     if err != nil {
         log.Fatal(err)
     }
-    ironic_api, err := ioutil.ReadFile("files/ironic_api.sh")
+    ironic_api, err := box.FindString("ironic_api.sh")
     if err != nil {
         log.Fatal(err)
     }
-    ironic_conductor, err := ioutil.ReadFile("files/ironic_conductor.sh")
+    ironic_conductor, err := box.FindString("ironic_conductor.sh")
     if err != nil {
         log.Fatal(err)
     }
-    ironic_conductor_init, err := ioutil.ReadFile("files/ironic_conductor_init.sh")
+    ironic_conductor_init, err := box.FindString("ironic_conductor_init.sh")
     if err != nil {
         log.Fatal(err)
     }
-    ironic_conductor_pxe, err := ioutil.ReadFile("files/ironic_conductor_pxe.sh")
+    ironic_conductor_pxe, err := box.FindString("ironic_conductor_pxe.sh")
     if err != nil {
         log.Fatal(err)
     }
-    ironic_conductor_pxe_init, err := ioutil.ReadFile("files/ironic_conductor_pxe_init.sh")
+    ironic_conductor_pxe_init, err := box.FindString("ironic_conductor_pxe_init.sh")
     if err != nil {
         log.Fatal(err)
     }
-    ironic_conductor_http, err := ioutil.ReadFile("files/ironic_conductor_http.sh")
+    ironic_conductor_http, err := box.FindString("ironic_conductor_http.sh")
     if err != nil {
         log.Fatal(err)
     }
-    ironic_conductor_http_init, err := ioutil.ReadFile("files/ironic_conductor_http_init.sh")
+    ironic_conductor_http_init, err := box.FindString("ironic_conductor_http_init.sh")
     if err != nil {
         log.Fatal(err)
     }
@@ -71,16 +73,16 @@ func GetIronicBinConfigMap(m *ironicv1alpha1.IronicApi) (*v1.ConfigMap, error) {
             Namespace: m.Namespace,
         },
         Data: map[string]string{
-            "db-init.py": string(db_init),
-            "db-sync.sh": string(db_sync),
-            "rabbit-init.sh": string(rabbit_init),
-            "ironic-api.sh": string(ironic_api),
-            "ironic-conductor.sh": string(ironic_conductor),
-            "ironic-conductor-init.sh": string(ironic_conductor_init),
-            "ironic-conductor-pxe.sh": string(ironic_conductor_pxe),
-            "ironic-conductor-pxe-init.sh": string(ironic_conductor_pxe_init),
-            "ironic-conductor-http.sh": string(ironic_conductor_http),
-            "ironic-conductor-http-init.sh": string(ironic_conductor_http_init),
+            "db-init.py": db_init,
+            "db-sync.sh": db_sync,
+            "rabbit-init.sh": rabbit_init,
+            "ironic-api.sh": ironic_api,
+            "ironic-conductor.sh": ironic_conductor,
+            "ironic-conductor-init.sh": ironic_conductor_init,
+            "ironic-conductor-pxe.sh": ironic_conductor_pxe,
+            "ironic-conductor-pxe-init.sh": ironic_conductor_pxe_init,
+            "ironic-conductor-http.sh": ironic_conductor_http,
+            "ironic-conductor-http-init.sh": ironic_conductor_http_init,
         },
     }
     return cm, nil
