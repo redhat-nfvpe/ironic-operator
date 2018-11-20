@@ -110,6 +110,22 @@ func (r *ReconcileIronicApi) Reconcile(request reconcile.Request) (reconcile.Res
         return reconcile.Result{}, err
     }
 
+    cm_etc_found := &corev1.ConfigMap{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-etc", Namespace: instance.Namespace}, cm_etc_found)
+    if err != nil && errors.IsNotFound(err) {
+        // define a new configmap
+        cm_etc, _ := helpers.GetIronicEtcConfigMap(instance)
+        reqLogger.Info("Creating a new ironic-etc configmap", "ConfigMap.Namespace", cm_etc.Namespace, "ConfigMap.Name", cm_etc.Name)
+        err = r.client.Create(context.TODO(), cm_etc)
+        if err != nil {
+            reqLogger.Error(err, "failed to create a new ConfigMap", "ConfigMap.Namespace", cm_etc.Namespace, "ConfigMap.Name", cm_etc.Name)
+            return reconcile.Result{}, err
+        }
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get ironic-etc ConfigMap")
+        return reconcile.Result{}, err
+    }
+
 	// Check if the deployment already exists, if not create a new one
 	found := &appsv1.Deployment{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, found)

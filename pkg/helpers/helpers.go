@@ -17,7 +17,7 @@ package helpers
 import (
     "log"
     ironicv1alpha1 "github.com/redhat-nfvpe/ironic-operator/pkg/apis/ironic/v1alpha1"
-    packr "github.com/gobuffalo/packr"
+    packr "github.com/gobuffalo/packr/v2"
 
     v1 "k8s.io/api/core/v1"
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +25,7 @@ import (
 
 func GetIronicBinConfigMap(m *ironicv1alpha1.IronicApi) (*v1.ConfigMap, error) {
     // read all bin scripts
-    box := packr.NewBox("./files")
+    box := packr.New("files", "../../files")
 
     db_init, err := box.FindString("db_init.py")
     if err != nil {
@@ -83,6 +83,42 @@ func GetIronicBinConfigMap(m *ironicv1alpha1.IronicApi) (*v1.ConfigMap, error) {
             "ironic-conductor-pxe-init.sh": ironic_conductor_pxe_init,
             "ironic-conductor-http.sh": ironic_conductor_http,
             "ironic-conductor-http-init.sh": ironic_conductor_http_init,
+        },
+    }
+    return cm, nil
+}
+
+func GetIronicEtcConfigMap(m *ironicv1alpha1.IronicApi) (*v1.ConfigMap, error) {
+    // read all bin scripts
+    box := packr.New("files", "../../files")
+
+    ironic_conf, err := box.FindString("ironic.conf")
+    if err != nil {
+        log.Fatal(err)
+    }
+    policy_json, err := box.FindString("policy.json")
+    if err != nil {
+        log.Fatal(err)
+    }
+    tftp_map, err := box.FindString("tftp_map.txt")
+    if err != nil {
+        log.Fatal(err)
+    }
+    nginx_conf, err := box.FindString("nginx.conf")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    cm := &v1.ConfigMap{
+        ObjectMeta: metav1.ObjectMeta{
+            Name: "ironic-etc",
+            Namespace: m.Namespace,
+        },
+        Data: map[string]string{
+            "ironic.conf": ironic_conf,
+            "policy.json": policy_json,
+            "tftp-map-file": tftp_map,
+            "nginx.conf": nginx_conf,
         },
     }
     return cm, nil
