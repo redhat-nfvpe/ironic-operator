@@ -158,6 +158,27 @@ func (r *ReconcileIronicApi) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+    // Check if the service already exists, if not create a new one
+    found_srv := &corev1.Service{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, found_srv)
+    if err != nil && errors.IsNotFound(err) {
+        // Define a new service
+        srv := r.serviceForIronicApi(instance)
+
+		reqLogger.Info("Creating a new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+		err = r.client.Create(context.TODO(), srv)
+		if err != nil {
+			reqLogger.Error(err, "failed to create new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+			return reconcile.Result{}, err
+		}
+		// Service created successfully - return and requeue
+		return reconcile.Result{Requeue: true}, nil
+	} else if err != nil {
+		reqLogger.Error(err, "failed to get Service")
+		return reconcile.Result{}, err
+    }
+
+
 	// Update the Ironic Api status with the pod names
 	// List the pods for this ironic api's deployment
 	podList := &corev1.PodList{}
@@ -352,6 +373,35 @@ func getPodNames(pods []corev1.Pod) []string {
 		podNames = append(podNames, pod.Name)
 	}
 	return podNames
+}
+
+// serviceForIronicApi returns a ironic-api Service object
+func (r *ReconcileIronicApi) serviceForIronicApi(m *ironicv1alpha1.IronicApi) *corev1.Service {
+
+    srv_selector := map[string]string{"release_group": "rocky", "application": "ironic", "component": "api"}
+	srv := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "apps/v1",
+			Kind:       "Service",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name,
+			Namespace: m.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+            Type: "NodePort",
+			Selector: srv_selector,
+            Ports: []corev1.ServicePort{
+                {
+                    Name: "ironic-api",
+                    Protocol: "TCP",
+                    Port: 6385,
+                    NodePort: 32732,
+                },
+            },
+		},
+	}
+	return srv
 }
 
 
