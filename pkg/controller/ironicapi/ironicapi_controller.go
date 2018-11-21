@@ -378,7 +378,7 @@ func getPodNames(pods []corev1.Pod) []string {
 // serviceForIronicApi returns a ironic-api Service object
 func (r *ReconcileIronicApi) serviceForIronicApi(m *ironicv1alpha1.IronicApi) *corev1.Service {
 
-    srv_selector := map[string]string{"release_group": "rocky", "application": "ironic", "component": "api"}
+    srv_selector := map[string]string{"app": "ironic", "ironicapi_cr": "openstack-ironicapi"}
 	srv := &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
