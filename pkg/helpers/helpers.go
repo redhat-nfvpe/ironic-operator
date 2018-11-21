@@ -16,14 +16,13 @@ package helpers
 
 import (
     "log"
-    ironicv1alpha1 "github.com/redhat-nfvpe/ironic-operator/pkg/apis/ironic/v1alpha1"
     packr "github.com/gobuffalo/packr/v2"
 
     v1 "k8s.io/api/core/v1"
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetIronicBinConfigMap(m *ironicv1alpha1.IronicApi) (*v1.ConfigMap, error) {
+func GetIronicBinConfigMap(namespace string) (*v1.ConfigMap, error) {
     // read all bin scripts
     box := packr.New("files", "../../files")
 
@@ -70,7 +69,7 @@ func GetIronicBinConfigMap(m *ironicv1alpha1.IronicApi) (*v1.ConfigMap, error) {
     cm := &v1.ConfigMap{
         ObjectMeta: metav1.ObjectMeta{
             Name: "ironic-bin",
-            Namespace: m.Namespace,
+            Namespace: namespace,
         },
         Data: map[string]string{
             "db-init.py": db_init,
@@ -88,7 +87,7 @@ func GetIronicBinConfigMap(m *ironicv1alpha1.IronicApi) (*v1.ConfigMap, error) {
     return cm, nil
 }
 
-func GetIronicEtcConfigMap(m *ironicv1alpha1.IronicApi) (*v1.ConfigMap, error) {
+func GetIronicEtcConfigMap(namespace string) (*v1.ConfigMap, error) {
     // read all bin scripts
     box := packr.New("files", "../../files")
 
@@ -112,7 +111,7 @@ func GetIronicEtcConfigMap(m *ironicv1alpha1.IronicApi) (*v1.ConfigMap, error) {
     cm := &v1.ConfigMap{
         ObjectMeta: metav1.ObjectMeta{
             Name: "ironic-etc",
-            Namespace: m.Namespace,
+            Namespace: namespace,
         },
         Data: map[string]string{
             "ironic.conf": ironic_conf,

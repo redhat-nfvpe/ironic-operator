@@ -1,0 +1,7 @@
+apiVersion: ironic.openstack.com/v1alpha1
+kind: IronicConductor
+metadata:
+  name: example-ironicconductor
+spec:
+  # Add fields here
+  size: 3

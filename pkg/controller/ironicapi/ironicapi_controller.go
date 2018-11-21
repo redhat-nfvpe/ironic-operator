@@ -98,7 +98,7 @@ func (r *ReconcileIronicApi) Reconcile(request reconcile.Request) (reconcile.Res
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-bin", Namespace: instance.Namespace}, cm_found)
     if err != nil && errors.IsNotFound(err) {
         // define a new configmap
-        cm, _ := helpers.GetIronicBinConfigMap(instance)
+        cm, _ := helpers.GetIronicBinConfigMap(instance.Namespace)
         reqLogger.Info("Creating a new ironic-bin configmap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
         err = r.client.Create(context.TODO(), cm)
         if err != nil {
@@ -114,7 +114,7 @@ func (r *ReconcileIronicApi) Reconcile(request reconcile.Request) (reconcile.Res
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-etc", Namespace: instance.Namespace}, cm_etc_found)
     if err != nil && errors.IsNotFound(err) {
         // define a new configmap
-        cm_etc, _ := helpers.GetIronicEtcConfigMap(instance)
+        cm_etc, _ := helpers.GetIronicEtcConfigMap(instance.Namespace)
         reqLogger.Info("Creating a new ironic-etc configmap", "ConfigMap.Namespace", cm_etc.Namespace, "ConfigMap.Name", cm_etc.Name)
         err = r.client.Create(context.TODO(), cm_etc)
         if err != nil {
@@ -381,7 +381,7 @@ func (r *ReconcileIronicApi) serviceForIronicApi(m *ironicv1alpha1.IronicApi) *c
     srv_selector := map[string]string{"app": "ironic", "ironicapi_cr": "openstack-ironicapi"}
 	srv := &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps/v1",
+			APIVersion: "core/v1",
 			Kind:       "Service",
 		},
 		ObjectMeta: metav1.ObjectMeta{
