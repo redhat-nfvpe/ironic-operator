@@ -14,6 +14,7 @@ import (
     "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
     mysqlv1 "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
+
     "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -761,10 +762,6 @@ func (r *ReconcileIronicConductor) GetMysqlCluster(namespace string) *mysqlv1.Cl
     var storageClassName string = "managed-nfs-storage"
 
     cluster := &mysqlv1.Cluster {
-        TypeMeta: metav1.TypeMeta{
-            APIVersion: "mysql.oracle.com/v1alpha1",
-            Kind:       "Cluster",
-        },
         ObjectMeta: metav1.ObjectMeta{
             Name:      "ironic-mysql-cluster",
             Namespace: namespace,
