@@ -126,6 +126,7 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         return reconcile.Result{}, err
     }
 
+    // create init jobs
     job_init_found := &batchv1.Job{}
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-db-init", Namespace: instance.Namespace}, job_init_found)
     if err != nil && errors.IsNotFound(err) {
