@@ -129,7 +129,7 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
     // Check if the service accounts, roles, etc... already exist, or create new
     // ones if needed
     sa_found := &corev1.ServiceAccount{}
-    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-conductor", Namespace: instance.Namespace}, sa_found)
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "openstack-ironicconductor", Namespace: instance.Namespace}, sa_found)
     if err != nil && errors.IsNotFound(err) {
         // define a new service account
         sa := r.ServiceAccountForIronicConductor(instance)
@@ -264,7 +264,7 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                     Labels: ls,
                 },
                 Spec: corev1.PodSpec {
-                    ServiceAccountName: "ironic-conductor",
+                    ServiceAccountName: "openstack-ironicconductor",
                     NodeSelector: node_selector,
                     SecurityContext: &corev1.PodSecurityContext {
                         RunAsUser: &rootUser,
