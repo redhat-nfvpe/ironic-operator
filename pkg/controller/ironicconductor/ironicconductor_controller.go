@@ -126,56 +126,6 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         return reconcile.Result{}, err
     }
 
-    // Check if the service accounts, roles, etc... already exist, or create new
-    // ones if needed
-    sa_found := &corev1.ServiceAccount{}
-    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "openstack-ironicconductor", Namespace: instance.Namespace}, sa_found)
-    if err != nil && errors.IsNotFound(err) {
-        // define a new service account
-        sa := r.ServiceAccountForIronicConductor(instance)
-        reqLogger.Info("Creating a new ironic-conductor service account", "ServiceAccount.Namespace", sa.Namespace, "ServiceAccount.Name", sa.Name)
-        err = r.client.Create(context.TODO(), sa)
-        if err != nil {
-            reqLogger.Error(err, "failed to create a new ServiceAccount", "ServiceAccount.Namespace", sa.Namespace, "ServiceAccount.Name", sa.Name)
-            return reconcile.Result{}, err
-        }
-    } else if err != nil {
-        reqLogger.Error(err, "failed to get ironic-conductor ServiceAccount")
-        return reconcile.Result{}, err
-    }
-
-    rb_found := &authv1.RoleBinding{}
-    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-conductor", Namespace: instance.Namespace}, rb_found)
-    if err != nil && errors.IsNotFound(err) {
-        // define a new role binding
-        rb := r.RoleBindingForIronicConductor(instance)
-        reqLogger.Info("Creating a new ironic-conductor role binding", "RoleBinding.Namespace", rb.Namespace, "RoleBinding.Name", rb.Name)
-        err = r.client.Create(context.TODO(), rb)
-        if err != nil {
-            reqLogger.Error(err, "failed to create a new RoleBinding", "RoleBinding.Namespace", rb.Namespace, "RoleBinding.Name", rb.Name)
-            return reconcile.Result{}, err
-        }
-    } else if err != nil {
-        reqLogger.Error(err, "failed to get ironic-conductor RoleBinding")
-        return reconcile.Result{}, err
-    }
-
-    r_found := &authv1.Role{}
-    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-conductor", Namespace: instance.Namespace}, r_found)
-    if err != nil && errors.IsNotFound(err) {
-        // define a new role
-        role := r.RoleForIronicConductor(instance)
-        reqLogger.Info("Creating a new ironic-conductor role", "Role.Namespace", role.Namespace, "Role.Name", role.Name)
-        err = r.client.Create(context.TODO(), role)
-        if err != nil {
-            reqLogger.Error(err, "failed to create a new Role", "Role.Namespace", role.Namespace, "Role.Name", role.Name)
-            return reconcile.Result{}, err
-        }
-    } else if err != nil {
-        reqLogger.Error(err, "failed to get ironic-conductor Role")
-        return reconcile.Result{}, err
-    }
-
     // Check if the deployment already exists, if not create a new one
     found := &appsv1.StatefulSet{}
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, found)
@@ -264,7 +214,6 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                     Labels: ls,
                 },
                 Spec: corev1.PodSpec {
-                    ServiceAccountName: "openstack-ironicconductor",
                     NodeSelector: node_selector,
                     SecurityContext: &corev1.PodSecurityContext {
                         RunAsUser: &rootUser,
@@ -573,65 +522,4 @@ func getPodNames(pods []corev1.Pod) []string {
                 podNames = append(podNames, pod.Name)
         }
         return podNames
-}
-
-func (r *ReconcileIronicConductor) ServiceAccountForIronicConductor(m *ironicv1alpha1.IronicConductor) *corev1.ServiceAccount {
-    sa := &corev1.ServiceAccount {
-        TypeMeta: metav1.TypeMeta {
-            APIVersion: "core/v1",
-            Kind: "ServiceAccount",
-        },
-        ObjectMeta: metav1.ObjectMeta {
-            Name: m.Name,
-            Namespace: m.Namespace,
-        },
-    }
-    return sa
-}
-
-func (r *ReconcileIronicConductor)RoleBindingForIronicConductor(m *ironicv1alpha1.IronicConductor) *authv1.RoleBinding {
-    rb := &authv1.RoleBinding {
-        TypeMeta: metav1.TypeMeta {
-            APIVersion: "rbac/v1",
-            Kind: "RoleBinding",
-        },
-        ObjectMeta: metav1.ObjectMeta {
-            Name: m.Name,
-            Namespace: m.Namespace,
-        },
-        RoleRef: authv1.RoleRef {
-            APIGroup: "rbac.authorization.k8s.io",
-            Kind: "Role",
-            Name: "default-ironic-conductor",
-        },
-        Subjects: []authv1.Subject {
-            {
-                Kind: "ServiceAccount",
-                Name: m.Name,
-                Namespace: m.Namespace,
-            },
-        },
-    }
-    return rb
-}
-
-func (r *ReconcileIronicConductor)RoleForIronicConductor(m *ironicv1alpha1.IronicConductor) *authv1.Role {
-    role := &authv1.Role {
-        TypeMeta: metav1.TypeMeta {
-            APIVersion: "rbac/v1",
-            Kind: "Role",
-        },
-        ObjectMeta: metav1.ObjectMeta {
-            Name: m.Name,
-            Namespace: m.Namespace,
-        },
-        Rules: []authv1.PolicyRule {
-            {
-                APIGroups: []string { "", "extensions", "batch", "apps" },
-                Verbs: []string { "Get", "List" },
-                Resources: []string { "Services", "Endpoints", "Jobs", "Pods" },
-            },
-        },
-    }
-    return role
 }
