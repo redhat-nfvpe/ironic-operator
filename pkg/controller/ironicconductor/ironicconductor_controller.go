@@ -11,7 +11,9 @@ import (
     batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+    "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    mysqlv1 "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
     "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -123,6 +125,23 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         }
     } else if err != nil {
         reqLogger.Error(err, "failed to get ironic-etc ConfigMap")
+        return reconcile.Result{}, err
+    }
+
+    // create mysql cluster
+    mysql_cluster_found := &mysqlv1.Cluster{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-mysql-cluster", Namespace: instance.Namespace}, mysql_cluster_found)
+    if err != nil && errors.IsNotFound(err) {
+        // define a new mysql cluster
+        mysql_cluster := r.GetMysqlCluster(instance.Namespace)
+        reqLogger.Info("Creating a new ironic-mysql-cluster", "Cluster.Namespace", mysql_cluster.Namespace, "Cluster.Name", mysql_cluster.Name)
+        err = r.client.Create(context.TODO(), mysql_cluster)
+        if err != nil {
+            reqLogger.Error(err, "failed to create a new MySQL Cluster", "Cluster.Namespace", mysql_cluster.Namespace, "Cluster.Name", mysql_cluster.Name)
+            return reconcile.Result{}, err
+        }
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get ironic-mysql-cluster")
         return reconcile.Result{}, err
     }
 
@@ -526,6 +545,7 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
     return sta
 }
 
+
 func (r *ReconcileIronicConductor) GetDbInitJob(namespace string) *batchv1.Job {
     node_selector := map[string]string{"ironic-control-plane": "enabled"}
     var readMode int32 = 0444
@@ -621,9 +641,9 @@ func (r *ReconcileIronicConductor) GetDbInitJob(namespace string) *batchv1.Job {
                                     ValueFrom: &corev1.EnvVarSource {
                                         SecretKeyRef: &corev1.SecretKeySelector {
                                             LocalObjectReference: corev1.LocalObjectReference {
-                                                Name: "mysql-root-password",
+                                                Name: "mysql-root-credentials",
                                             },
-                                            Key: "password",
+                                            Key: "ROOT_DB_PASSWORD",
                                         },
                                     },
                                 },
@@ -736,6 +756,48 @@ func (r *ReconcileIronicConductor) GetDbInitJob(namespace string) *batchv1.Job {
     }
 
     return job
+}
+func (r *ReconcileIronicConductor) GetMysqlCluster(namespace string) *mysqlv1.Cluster {
+    var storageClassName string = "managed-nfs-storage"
+
+    cluster := &mysqlv1.Cluster {
+        TypeMeta: metav1.TypeMeta{
+            APIVersion: "mysql.oracle.com/v1alpha1",
+            Kind:       "Cluster",
+        },
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      "ironic-mysql-cluster",
+            Namespace: namespace,
+        },
+        Spec: mysqlv1.ClusterSpec {
+            Members: 1,
+            RootPasswordSecret: &corev1.LocalObjectReference {
+                Name: "mysql-root-password",
+            },
+            VolumeClaimTemplate: &corev1.PersistentVolumeClaim {
+                TypeMeta: metav1.TypeMeta {
+                    APIVersion: "core/v1",
+                },
+                ObjectMeta: metav1.ObjectMeta {
+                    Name: "ironic-mysqlcluster-data",
+                    Namespace: namespace,
+                },
+                Spec: corev1.PersistentVolumeClaimSpec {
+                    StorageClassName: &storageClassName,
+                    AccessModes: []corev1.PersistentVolumeAccessMode {
+                        "ReadWriteMany",
+                    },
+                    Resources: corev1.ResourceRequirements {
+                        Requests: corev1.ResourceList {
+                            corev1.ResourceStorage: resource.MustParse("1Gi"),
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    return cluster
 }
 
 // labelsForIronicConductor returns the labels for selecting the resources
