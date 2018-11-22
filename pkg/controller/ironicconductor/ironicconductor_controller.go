@@ -8,7 +8,7 @@ import (
     helpers "github.com/redhat-nfvpe/ironic-operator/pkg/helpers"
 
     appsv1 "k8s.io/api/apps/v1"
-    authv1 "k8s.io/api/rbac/v1"
+    batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,6 +123,22 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         }
     } else if err != nil {
         reqLogger.Error(err, "failed to get ironic-etc ConfigMap")
+        return reconcile.Result{}, err
+    }
+
+    job_init_found := &batchv1.Job{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-db-init", Namespace: instance.Namespace}, job_init_found)
+    if err != nil && errors.IsNotFound(err) {
+        // define a new db init job
+        job_init := r.GetDbInitJob(instance.Namespace)
+        reqLogger.Info("Creating a new ironic-db-init job", "Job.Namespace", job_init.Namespace, "Job.Name", job_init.Name)
+        err = r.client.Create(context.TODO(), job_init)
+        if err != nil {
+            reqLogger.Error(err, "failed to create a new Job", "Job.Namespace", job_init.Namespace, "Job.Name", job_init.Name)
+            return reconcile.Result{}, err
+        }
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get db-init job")
         return reconcile.Result{}, err
     }
 
@@ -507,6 +523,218 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
 
     controllerutil.SetControllerReference(m, sta, r.scheme)
     return sta
+}
+
+func (r *ReconcileIronicConductor) GetDbInitJob(namespace string) *batchv1.Job {
+    node_selector := map[string]string{"ironic-control-plane": "enabled"}
+    var readMode int32 = 0444
+    var execMode int32 = 0555
+
+    job := &batchv1.Job{
+        TypeMeta: metav1.TypeMeta{
+            APIVersion: "batch/v1",
+            Kind:       "Job",
+        },
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      "ironic-db-init",
+            Namespace: namespace,
+        },
+        Spec: batchv1.JobSpec {
+            Template: corev1.PodTemplateSpec{
+                ObjectMeta: metav1.ObjectMeta {
+                    Labels: map[string]string {"app": "ironic", "ironicapi_cr": "openstack-ironicapi", "component": "db-init" },
+                },
+                Spec: corev1.PodSpec {
+                    NodeSelector: node_selector,
+                    RestartPolicy: "OnFailure",
+                    InitContainers: []corev1.Container{
+                        {
+                            Name: "init",
+                            Image: "quay.io/stackanetes/kubernetes-entrypoint:v0.3.1",
+                            ImagePullPolicy: "IfNotPresent",
+                            Env: []corev1.EnvVar {
+                                {
+                                    Name: "POD_NAME",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        FieldRef: &corev1.ObjectFieldSelector {
+                                            APIVersion: "v1",
+                                            FieldPath: "metadata.name",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "NAMESPACE",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        FieldRef: &corev1.ObjectFieldSelector {
+                                            APIVersion: "v1",
+                                            FieldPath: "metadata.namespace",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "PATH",
+                                    Value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/",
+                                },
+                                {
+                                    Name: "DEPENDENCY_SERVICE",
+                                    Value: "mysql",
+                                },
+                                {
+                                    Name: "COMMAND",
+                                    Value: "echo done",
+                                },
+                            },
+                            Command: []string { "kubernetes-entrypoint" },
+                        },
+                    },
+                    Containers: []corev1.Container {
+                        {
+                            Name: "ironic-db-init-0",
+                            Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-api",
+                            ImagePullPolicy: "IfNotPresent",
+                            Env: []corev1.EnvVar {
+                                {
+                                    Name: "ROOT_DB_HOST",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        SecretKeyRef: &corev1.SecretKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "mysql-root-credentials",
+                                            },
+                                            Key: "ROOT_DB_HOST",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "ROOT_DB_USER",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        SecretKeyRef: &corev1.SecretKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "mysql-root-credentials",
+                                            },
+                                            Key: "ROOT_DB_USER",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "ROOT_DB_PASSWORD",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        SecretKeyRef: &corev1.SecretKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "mysql-root-password",
+                                            },
+                                            Key: "password",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "USER_DB_HOST",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        SecretKeyRef: &corev1.SecretKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "ironic-db-user",
+                                            },
+                                            Key: "DB_HOST",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "USER_DB_USER",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        SecretKeyRef: &corev1.SecretKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "ironic-db-user",
+                                            },
+                                            Key: "DB_USER",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "USER_DB_PASSWORD",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        SecretKeyRef: &corev1.SecretKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "ironic-db-user",
+                                            },
+                                            Key: "DB_PASSWORD",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "USER_DB_DATABASE",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        SecretKeyRef: &corev1.SecretKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "ironic-db-user",
+                                            },
+                                            Key: "DB_DATABASE",
+                                        },
+                                    },
+                                },
+
+                            },
+                            Command: []string { "/tmp/db-init.py" },
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "db-init-py",
+                                    MountPath: "/tmp/db-init.py",
+                                    SubPath: "db-init.py",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "etc-service",
+                                    MountPath: "/etc/ironic",
+                                },
+                                {
+                                    Name: "db-init-conf",
+                                    MountPath: "/etc/ironic/ironic.conf",
+                                    SubPath: "ironic.conf",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "db-init-conf",
+                                    MountPath: "/etc/ironic/logging.conf",
+                                    SubPath: "logging.conf",
+                                    ReadOnly: true,
+                                },
+                            },
+                        },
+                    },
+                    Volumes: []corev1.Volume {
+                        {
+                            Name: "etc-service",
+                            VolumeSource: corev1.VolumeSource {
+                                EmptyDir: &corev1.EmptyDirVolumeSource {},
+                            },
+                        },
+                        {
+                            Name: "db-init-py",
+                            VolumeSource: corev1.VolumeSource {
+                                ConfigMap: &corev1.ConfigMapVolumeSource {
+                                    DefaultMode: &execMode,
+                                    LocalObjectReference: corev1.LocalObjectReference {
+                                        Name: "ironic-bin",
+                                    },
+                                },
+                            },
+                        },
+                        {
+                            Name: "db-init-conf",
+                            VolumeSource: corev1.VolumeSource {
+                                ConfigMap: &corev1.ConfigMapVolumeSource {
+                                    DefaultMode: &readMode,
+                                    LocalObjectReference: corev1.LocalObjectReference {
+                                        Name: "ironic-etc",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    return job
 }
 
 // labelsForIronicConductor returns the labels for selecting the resources
