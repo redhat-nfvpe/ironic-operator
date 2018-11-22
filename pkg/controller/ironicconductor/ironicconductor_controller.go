@@ -160,22 +160,38 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         return reconcile.Result{}, err
     }
 
-    // Check if the deployment already exists, if not create a new one
-    found := &appsv1.Deployment{}
-    err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, found)
+    r_found := &authv1.Role{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-conductor", Namespace: instance.Namespace}, r_found)
     if err != nil && errors.IsNotFound(err) {
-        // Define a new deployment
-        dep := r.deploymentForIronicConductor(instance)
-        reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-        err = r.client.Create(context.TODO(), dep)
+        // define a new role
+        role := r.RoleForIronicConductor(instance)
+        reqLogger.Info("Creating a new ironic-conductor role", "Role.Namespace", role.Namespace, "Role.Name", role.Name)
+        err = r.client.Create(context.TODO(), role)
         if err != nil {
-            reqLogger.Error(err, "failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+            reqLogger.Error(err, "failed to create a new Role", "Role.Namespace", role.Namespace, "Role.Name", role.Name)
             return reconcile.Result{}, err
         }
-        // Deployment created successfully - return and requeue
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get ironic-conductor Role")
+        return reconcile.Result{}, err
+    }
+
+    // Check if the deployment already exists, if not create a new one
+    found := &appsv1.StatefulSet{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, found)
+    if err != nil && errors.IsNotFound(err) {
+        // Define a new stateful set
+        sta := r.statefulSetForIronicConductor(instance)
+        reqLogger.Info("Creating a new StatefulSet", "StatefulSet.Namespace", sta.Namespace, "StatefulSet.Name", sta.Name)
+        err = r.client.Create(context.TODO(), sta)
+        if err != nil {
+            reqLogger.Error(err, "failed to create new StatefulSet", "StatefulSet.Namespace", sta.Namespace, "StatefulSet.Name", sta.Name)
+            return reconcile.Result{}, err
+        }
+        // Stateful set created successfully - return and requeue
         return reconcile.Result{Requeue: true}, nil
     } else if err != nil {
-        reqLogger.Error(err, "failed to get Deployment")
+        reqLogger.Error(err, "failed to get Stateful set")
         return reconcile.Result{}, err
     }
 
@@ -185,7 +201,7 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         found.Spec.Replicas = &size
         err = r.client.Update(context.TODO(), found)
         if err != nil {
-            reqLogger.Error(err, "failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+            reqLogger.Error(err, "failed to update Stateful set", "StatefulSEt.Namespace", found.Namespace, "StatefulSet.Name", found.Name)
             return reconcile.Result{}, err
         }
         // Spec updated - return and requeue
@@ -193,7 +209,7 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
     }
 
     // Update the Ironic Conductor status with the pod names
-    // List the pods for this ironic api's deployment
+    // List the pods for this ironic conductor's deployment
     podList := &corev1.PodList{}
     labelSelector := labels.SelectorFromSet(labelsForIronicConductor(instance.Name))
     listOps := &client.ListOptions{Namespace: instance.Namespace, LabelSelector: labelSelector}
@@ -217,21 +233,331 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
     return reconcile.Result{}, nil
 }
 
-// deploymentForIronicConductor returns a ironic-conductor Deployment object
-func (r *ReconcileIronicConductor) deploymentForIronicConductor(m *ironicv1alpha1.IronicConductor) *appsv1.Deployment {
+// statefulSetForIronicConductor returns a ironic-conductor StatefulSet object
+func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alpha1.IronicConductor) *appsv1.StatefulSet {
     ls := labelsForIronicConductor(m.Name)
     replicas := m.Spec.Size
 
     var readMode int32 = 0444
     var execMode int32 = 0555
+    var rootUser int64 = 0
+    var privTrue bool = true
 
     // Set IronicConductor instance as the owner and controller
-    dep := &appsv1.Deployment{
-
+    node_selector := map[string]string{"ironic-control-plane": "enabled"}
+    sta := &appsv1.StatefulSet{
+        TypeMeta: metav1.TypeMeta{
+            APIVersion: "apps/v1",
+            Kind:       "StatefulSet",
+        },
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      m.Name,
+            Namespace: m.Namespace,
+        },
+        Spec: appsv1.StatefulSetSpec{
+            Replicas: &replicas,
+            Selector: &metav1.LabelSelector{
+                MatchLabels: ls,
+            },
+            Template: corev1.PodTemplateSpec{
+                ObjectMeta: metav1.ObjectMeta {
+                    Labels: ls,
+                },
+                Spec: corev1.PodSpec {
+                    ServiceAccountName: "ironic-conductor",
+                    NodeSelector: node_selector,
+                    SecurityContext: &corev1.PodSecurityContext {
+                        RunAsUser: &rootUser,
+                    },
+                    HostNetwork: true,
+                    HostIPC: true,
+                    DNSPolicy: "ClusterFirstWithHostNet",
+                    InitContainers: []corev1.Container{
+                        {
+                            Name: "init",
+                            Image: "quay.io/stackanetes/kubernetes-entrypoint:v0.3.1",
+                            ImagePullPolicy: "IfNotPresent",
+                            Env: []corev1.EnvVar {
+                                {
+                                    Name: "POD_NAME",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        FieldRef: &corev1.ObjectFieldSelector {
+                                            APIVersion: "v1",
+                                            FieldPath: "metadata.name",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "NAMESPACE",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        FieldRef: &corev1.ObjectFieldSelector {
+                                            APIVersion: "v1",
+                                            FieldPath: "metadata.namespace",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "PATH",
+                                    Value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/",
+                                },
+                                {
+                                    Name: "DEPENDENCY_SERVICE",
+                                    Value: "default:ironic-api,default:rabbitmq",
+                                },
+                                {
+                                    Name: "DEPENDENCY_JOBS",
+                                    Value: "ironic-db-sync,ironic-rabbit-init",
+                                },
+                                {
+                                    Name: "COMMAND",
+                                    Value: "echo done",
+                                },
+                            },
+                            Command: []string { "kubernetes-entrypoint" },
+                        },
+                        {
+                            Name: "ironic-conductor-pxe-init",
+                            Image: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo",
+                            ImagePullPolicy: "IfNotPresent",
+                            Command: []string { "/tmp/ironic-conductor-pxe-init.sh" },
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "ironic-bin",
+                                    MountPath: "/tmp/ironic-conductor-pxe-init.sh",
+                                    SubPath: "ironic-conductor-pxe-init.sh",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "pod-data",
+                                    MountPath: "/var/lib/pod_data",
+                                },
+                            },
+                        },
+                        {
+                            Name: "ironic-conductor-init",
+                            Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-conductor",
+                            ImagePullPolicy: "IfNotPresent",
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "ironic-bin",
+                                    MountPath: "/tmp/ironic-conductor-init.sh",
+                                    SubPath: "ironic-conductor-init.sh",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "pod-shared",
+                                    MountPath: "/tmp/pod-shared",
+                                },
+                            },
+                        },
+                        {
+                            Name: "ironic-conductor-http-init",
+                            Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-conductor",
+                            ImagePullPolicy: "IfNotPresent",
+                            Env: []corev1.EnvVar {
+                                {
+                                    Name: "PXE_NIC",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "pxe-settings",
+                                            },
+                                            Key: "PXE_NIC",
+                                        },
+                                    },
+                                },
+                            },
+                            Command: []string { "/tmp/ironic-conductor-http-init.sh" },
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "ironic-bin",
+                                    MountPath: "/tmp/ironic-conductor-http-init.sh",
+                                    SubPath: "ironic-conductor-http-init.sh",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "ironic-etc",
+                                    MountPath: "/etc/nginx/nginx.conf",
+                                    SubPath: "nginx.conf",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "pod-shared",
+                                    MountPath: "/tmp/pod-shared",
+                                },
+                            },
+                        },
+                    },
+                    Containers: []corev1.Container {
+                        {
+                            Name: "ironic-conductor",
+                            Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-conductor",
+                            ImagePullPolicy: "IfNotPresent",
+                            SecurityContext: &corev1.SecurityContext {
+                                Privileged: &privTrue,
+                                RunAsUser: &rootUser,
+                            },
+                            Command: []string { "/tmp/ironic-conductor.sh" },
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "ironic-bin",
+                                    MountPath: "/tmp/ironic-conductor.sh",
+                                    SubPath: "ironic-conductor.sh",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "pod-shared",
+                                    MountPath: "/tmp/pod-shared",
+                                },
+                                {
+                                    Name: "pod-var-cache-ironic",
+                                    MountPath: "/var/cache/ironic",
+                                },
+                                {
+                                    Name: "ironic-etc",
+                                    MountPath: "/etc/ironic/ironic.conf",
+                                    SubPath: "ironic.conf",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "ironic-etc",
+                                    MountPath: "/etc/ironic/logging.conf",
+                                    SubPath: "logging.conf",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "pod-data",
+                                    MountPath: "/var/lib/pod_data",
+                                },
+                            },
+                        },
+                        {
+                            Name: "ironic-conductor-pxe",
+                            Image: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo",
+                            ImagePullPolicy: "IfNotPresent",
+                            SecurityContext: &corev1.SecurityContext {
+                                Privileged: &privTrue,
+                                RunAsUser: &rootUser,
+                            },
+                            Env: []corev1.EnvVar {
+                                {
+                                    Name: "PXE_NIC",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "pxe-settings",
+                                            },
+                                            Key: "PXE_NIC",
+                                        },
+                                    },
+                               },
+                            },
+                            Command: []string { "/tmp/ironic-conductor-pxe.sh" },
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "ironic-bin",
+                                    MountPath: "/tmp/ironic-conductor-pxe.sh",
+                                    SubPath: "ironic-conductor-pxe.sh",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "ironic-etc",
+                                    MountPath: "/tftp-map-file",
+                                    SubPath: "tftp-map-file",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "pod-data",
+                                    MountPath: "/var/lib/pod_data",
+                                },
+                            },
+                            Ports: []corev1.ContainerPort {
+                                {
+                                    ContainerPort: 69,
+                                    HostPort: 69,
+                                    Protocol: "UDP",
+                                },
+                            },
+                        },
+                        {
+                            Name: "ironic-conductor-http",
+                            Image: "docker.io/nginx:1.13.3",
+                            ImagePullPolicy: "IfNotPresent",
+                            Command: []string { "/tmp/ironic-conductor-http.sh" },
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "ironic-bin",
+                                    MountPath: "/tmp/ironic-conductor-http.sh",
+                                    SubPath: "ironic-conductor-http.sh",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "pod-shared",
+                                    MountPath: "/tmp/pod-shared",
+                                },
+                                {
+                                    Name: "pod-data",
+                                    MountPath: "/var/lib/pod_data",
+                                },
+                            },
+                            Ports: []corev1.ContainerPort {
+                                {
+                                    ContainerPort: 8081,
+                                    HostPort: 8081,
+                                    Protocol: "TCP",
+                                },
+                            },
+                        },
+                    },
+                    Volumes: []corev1.Volume {
+                        {
+                            Name: "pod-shared",
+                            VolumeSource: corev1.VolumeSource {
+                                EmptyDir: &corev1.EmptyDirVolumeSource {},
+                            },
+                        },
+                        {
+                            Name: "pod-data",
+                            VolumeSource: corev1.VolumeSource {
+                                EmptyDir: &corev1.EmptyDirVolumeSource {},
+                            },
+                        },
+                        {
+                            Name: "pod-var-cache-ironic",
+                            VolumeSource: corev1.VolumeSource {
+                                EmptyDir: &corev1.EmptyDirVolumeSource {},
+                            },
+                        },
+                        {
+                            Name: "ironic-bin",
+                            VolumeSource: corev1.VolumeSource {
+                                ConfigMap: &corev1.ConfigMapVolumeSource {
+                                    DefaultMode: &execMode,
+                                    LocalObjectReference: corev1.LocalObjectReference {
+                                        Name: "ironic-bin",
+                                    },
+                                },
+                            },
+                        },
+                        {
+                            Name: "ironic-etc",
+                            VolumeSource: corev1.VolumeSource {
+                                ConfigMap: &corev1.ConfigMapVolumeSource {
+                                    DefaultMode: &readMode,
+                                    LocalObjectReference: corev1.LocalObjectReference {
+                                        Name: "ironic-etc",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
     }
 
-    controllerutil.SetControllerReference(m, dep, r.scheme)
-    return dep
+    controllerutil.SetControllerReference(m, sta, r.scheme)
+    return sta
 }
 
 // labelsForIronicConductor returns the labels for selecting the resources
