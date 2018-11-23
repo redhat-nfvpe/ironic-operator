@@ -550,46 +550,6 @@ func (r *ReconcileIronicConductor) GetDbInitJob(namespace string) *batchv1.Job {
                 Spec: corev1.PodSpec {
                     NodeSelector: node_selector,
                     RestartPolicy: "OnFailure",
-                    InitContainers: []corev1.Container{
-                        {
-                            Name: "init",
-                            Image: "quay.io/stackanetes/kubernetes-entrypoint:v0.3.1",
-                            ImagePullPolicy: "IfNotPresent",
-                            Env: []corev1.EnvVar {
-                                {
-                                    Name: "POD_NAME",
-                                    ValueFrom: &corev1.EnvVarSource {
-                                        FieldRef: &corev1.ObjectFieldSelector {
-                                            APIVersion: "v1",
-                                            FieldPath: "metadata.name",
-                                        },
-                                    },
-                                },
-                                {
-                                    Name: "NAMESPACE",
-                                    ValueFrom: &corev1.EnvVarSource {
-                                        FieldRef: &corev1.ObjectFieldSelector {
-                                            APIVersion: "v1",
-                                            FieldPath: "metadata.namespace",
-                                        },
-                                    },
-                                },
-                                {
-                                    Name: "PATH",
-                                    Value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/",
-                                },
-                                {
-                                    Name: "DEPENDENCY_SERVICE",
-                                    Value: "ironic-mysql",
-                                },
-                                {
-                                    Name: "COMMAND",
-                                    Value: "echo done",
-                                },
-                            },
-                            Command: []string { "kubernetes-entrypoint" },
-                        },
-                    },
                     Containers: []corev1.Container {
                         {
                             Name: "ironic-db-init-0",
