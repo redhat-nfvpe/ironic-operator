@@ -34,13 +34,6 @@
   revision = "de5bf2ad457846296e2031421a34e2568e304e35"
 
 [[projects]]
-  digest = "1:e29f05b742d9ccbfb65faca82ec43da7742cb7b039469640823c64b639b91b92"
-  name = "github.com/coreos/go-semver"
-  packages = ["semver"]
-  pruneopts = "NT"
-  revision = "e214231b295a8ea9479f11b70b35d5acf3556d9b"
-
-[[projects]]
   digest = "1:4b8b5811da6970495e04d1f4e98bb89518cc3cfc3b3f456bdb876ed7b6c74049"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
@@ -279,12 +272,12 @@
   revision = "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 
 [[projects]]
-  digest = "1:a1578f7323eca2b88021fdc9a79a99833d40b12c32a5ea4f284e2fad19ea2657"
+  digest = "1:56a1f3949ebb7fa22fa6b4e4ac0fe0f77cc4faee5b57413e6fa9199a8458faf1"
   name = "github.com/google/uuid"
   packages = ["."]
   pruneopts = "NT"
-  revision = "d460ce9f8df2e77fb1ba55ca87fafed96c607494"
-  version = "v1.0.0"
+  revision = "9b3b1e0f5f99ae461456d768e7d301a7acdaa2d8"
+  version = "v1.1.0"
 
 [[projects]]
   digest = "1:289332c13b80edfefc88397cce5266c16845dcf204fa2f6ac7e464ee4c7f6e96"
@@ -422,26 +415,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:57b5e60954a9c1e3b17427ccab5771b96d6c9d48114cb50331eceff2ddc6ad45"
+  digest = "1:9fa331dedf8447af2c89d7e609b8ecff56849ee3863b0bc28e634037bc6335d1"
   name = "github.com/operator-framework/operator-sdk"
   packages = [
     "pkg/k8sutil",
     "version",
   ]
   pruneopts = "NT"
-  revision = "8412ccb47e4c7e14a5634e563e38e6bc05faa434"
-
-[[projects]]
-  digest = "1:6768d18767971e38080b81a85ab4cac3b0d2ca5b8005352a6ab2d19b7b1bad62"
-  name = "github.com/oracle/mysql-operator"
-  packages = [
-    "pkg/apis/mysql/v1alpha1",
-    "pkg/constants",
-    "pkg/version",
-  ]
-  pruneopts = "NT"
-  revision = "e3e319777091c8b0c76493cb1e974902fd4161e1"
-  version = "0.3.0"
+  revision = "c793226f60d5fe137ea2a4eae783cf1e25e09591"
 
 [[projects]]
   digest = "1:93b1d84c5fa6d1ea52f4114c37714cddd84d5b78f151b62bb101128dd51399bf"
@@ -555,7 +536,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:948ab99b3a990ee11c6beb2d9e65217961897cbc0842acb57aad3d9f63c28f7e"
+  digest = "1:d25e419b2334aeb766bd3ed55ad61c9e85f82a46b53fc38d31ce909252dab20a"
   name = "golang.org/x/oauth2"
   packages = [
     ".",
@@ -565,18 +546,18 @@
     "jwt",
   ]
   pruneopts = "NT"
-  revision = "f42d05182288abf10faef86d16c0d07b8d40ea2d"
+  revision = "8f65e3013ebad444f13bc19536f7865efc793816"
 
 [[projects]]
   branch = "master"
-  digest = "1:5842bdbec06c1ea8891c369eff3033e9d73c201844b0c34f9ca556b0b8f5063a"
+  digest = "1:478c51e86c9a8a3681d8ab60317e1f9115e805c3288a08d9cecef33a5dda1c94"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "NT"
-  revision = "66b7b1311ac80bbafcd2daeef9a5e6e2cd1e2399"
+  revision = "62eef0e2fa9b2c385f7b2778e763486da6880d37"
 
 [[projects]]
   digest = "1:8c74f97396ed63cc2ef04ebb5fc37bb032871b8fd890a25991ed40974b00cd2a"
@@ -612,7 +593,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a6d387402684066899a57f8d07213ee3c3b7fa46d8248cdc305fe4b1bd6e212a"
+  digest = "1:47efe3ab270e3717dd484f66108933f799a12c13dd4aa54fc88036d12ccaf957"
   name = "golang.org/x/tools"
   packages = [
     "go/ast/astutil",
@@ -621,7 +602,7 @@
     "internal/gopathwalk",
   ]
   pruneopts = "NT"
-  revision = "f87c222f148786695d2ee5761b06751bb9211f61"
+  revision = "04b5d21e00f1f47bd824a6ade581e7189bacde87"
 
 [[projects]]
   digest = "1:2a4972ee51c3b9dfafbb3451fa0552e7a198d9d12c721bfc492050fe2f72e0f6"
@@ -934,11 +915,11 @@
     "github.com/gobuffalo/packr/v2/file/resolver",
     "github.com/operator-framework/operator-sdk/pkg/k8sutil",
     "github.com/operator-framework/operator-sdk/version",
-    "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1",
     "k8s.io/api/apps/v1",
     "k8s.io/api/batch/v1",
     "k8s.io/api/core/v1",
     "k8s.io/apimachinery/pkg/api/errors",
+    "k8s.io/apimachinery/pkg/api/resource",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/labels",
     "k8s.io/apimachinery/pkg/runtime",

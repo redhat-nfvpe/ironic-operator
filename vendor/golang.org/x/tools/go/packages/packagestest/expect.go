@@ -7,11 +7,12 @@ package packagestest
 import (
 	"fmt"
 	"go/token"
+	"path/filepath"
 	"reflect"
 	"regexp"
-	"strings"
 
 	"golang.org/x/tools/go/expect"
+	"golang.org/x/tools/go/packages"
 )
 
 const (
@@ -131,11 +132,18 @@ func (e *Exported) getNotes() error {
 		return nil
 	}
 	notes := []*expect.Note{}
+	var dirs []string
 	for _, module := range e.written {
 		for _, filename := range module {
-			if !strings.HasSuffix(filename, ".go") {
-				continue
-			}
+			dirs = append(dirs, filepath.Dir(filename))
+		}
+	}
+	pkgs, err := packages.Load(e.Config, dirs...)
+	if err != nil {
+		return fmt.Errorf("unable to load packages for directories %s: %v", dirs, err)
+	}
+	for _, pkg := range pkgs {
+		for _, filename := range pkg.GoFiles {
 			l, err := expect.Parse(e.fset, filename, nil)
 			if err != nil {
 				return fmt.Errorf("Failed to extract expectations: %v", err)
@@ -164,6 +172,7 @@ var (
 	posType        = reflect.TypeOf(token.Pos(0))
 	positionType   = reflect.TypeOf(token.Position{})
 	rangeType      = reflect.TypeOf(Range{})
+	fsetType       = reflect.TypeOf((*token.FileSet)(nil))
 )
 
 // converter converts from a marker's argument parsed from the comment to
@@ -189,6 +198,10 @@ func (e *Exported) buildConverter(pt reflect.Type) (converter, error) {
 	case pt == noteType:
 		return func(n *expect.Note, args []interface{}) (reflect.Value, []interface{}, error) {
 			return reflect.ValueOf(n), args, nil
+		}, nil
+	case pt == fsetType:
+		return func(n *expect.Note, args []interface{}) (reflect.Value, []interface{}, error) {
+			return reflect.ValueOf(e.fset), args, nil
 		}, nil
 	case pt == posType:
 		return func(n *expect.Note, args []interface{}) (reflect.Value, []interface{}, error) {
