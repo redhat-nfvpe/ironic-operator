@@ -143,6 +143,21 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         reqLogger.Error(err, "failed to get db-init job")
         return reconcile.Result{}, err
     }
+    job_db_sync_found := &batchv1.Job{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-db-sync", Namespace: instance.Namespace}, job_db_sync_found)
+    if err != nil && errors.IsNotFound(err) {
+        // define a new db sync job
+        job_db_sync := r.GetDbSyncJob(instance.Namespace)
+        reqLogger.Info("Creating a new ironic-db-sync job", "Job.Namespace", job_db_sync.Namespace, "Job.Name", job_db_sync.Name)
+        err = r.client.Create(context.TODO(), job_db_sync)
+        if err != nil {
+            reqLogger.Error(err, "failed to create a new Job", "Job.Namespace", job_db_sync.Namespace, "Job.Name", job_db_sync.Name)
+            return reconcile.Result{}, err
+        }
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get db-sync job")
+        return reconcile.Result{}, err
+    }
 
     // Check if the deployment already exists, if not create a new one
     found := &appsv1.StatefulSet{}
@@ -527,7 +542,6 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
     return sta
 }
 
-
 func (r *ReconcileIronicConductor) GetDbInitJob(namespace string) *batchv1.Job {
     node_selector := map[string]string{"ironic-control-plane": "enabled"}
     var readMode int32 = 0444
@@ -682,6 +696,98 @@ func (r *ReconcileIronicConductor) GetDbInitJob(namespace string) *batchv1.Job {
                         },
                         {
                             Name: "db-init-conf",
+                            VolumeSource: corev1.VolumeSource {
+                                ConfigMap: &corev1.ConfigMapVolumeSource {
+                                    DefaultMode: &readMode,
+                                    LocalObjectReference: corev1.LocalObjectReference {
+                                        Name: "ironic-etc",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    return job
+}
+
+func (r *ReconcileIronicConductor) GetDbSyncJob(namespace string) *batchv1.Job {
+    node_selector := map[string]string{"ironic-control-plane": "enabled"}
+    var readMode int32 = 0444
+    var execMode int32 = 0555
+
+    job := &batchv1.Job{
+        TypeMeta: metav1.TypeMeta{
+            APIVersion: "batch/v1",
+            Kind:       "Job",
+        },
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      "ironic-db-sync",
+            Namespace: namespace,
+        },
+        Spec: batchv1.JobSpec {
+            Template: corev1.PodTemplateSpec{
+                ObjectMeta: metav1.ObjectMeta {
+                    Labels: map[string]string {"app": "ironic", "ironicapi_cr": "openstack-ironicapi", "component": "db-sync" },
+                },
+                Spec: corev1.PodSpec {
+                    NodeSelector: node_selector,
+                    RestartPolicy: "OnFailure",
+                    Containers: []corev1.Container {
+                        {
+                            Name: "ironic-db-sync",
+                            Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-api",
+                            ImagePullPolicy: "IfNotPresent",
+                            Command: []string { "/tmp/db-sync.sh" },
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "db-sync-sh",
+                                    MountPath: "/tmp/db-sync.sh",
+                                    SubPath: "db-sync.sh",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "etc-service",
+                                    MountPath: "/etc/ironic",
+                                },
+                                {
+                                    Name: "db-sync-conf",
+                                    MountPath: "/etc/ironic/ironic.conf",
+                                    SubPath: "ironic.conf",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "db-sync-conf",
+                                    MountPath: "/etc/ironic/logging.conf",
+                                    SubPath: "logging.conf",
+                                    ReadOnly: true,
+                                },
+                            },
+                        },
+                    },
+                    Volumes: []corev1.Volume {
+                        {
+                            Name: "etc-service",
+                            VolumeSource: corev1.VolumeSource {
+                                EmptyDir: &corev1.EmptyDirVolumeSource {},
+                            },
+                        },
+                        {
+                            Name: "db-sync-sh",
+                            VolumeSource: corev1.VolumeSource {
+                                ConfigMap: &corev1.ConfigMapVolumeSource {
+                                    DefaultMode: &execMode,
+                                    LocalObjectReference: corev1.LocalObjectReference {
+                                        Name: "ironic-bin",
+                                    },
+                                },
+                            },
+                        },
+                        {
+                            Name: "db-sync-conf",
                             VolumeSource: corev1.VolumeSource {
                                 ConfigMap: &corev1.ConfigMapVolumeSource {
                                     DefaultMode: &readMode,
