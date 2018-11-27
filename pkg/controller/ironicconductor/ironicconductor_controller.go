@@ -2,6 +2,7 @@ package ironicconductor
 
 import (
 	"context"
+    "fmt"
     "reflect"
 
 	ironicv1alpha1 "github.com/redhat-nfvpe/ironic-operator/pkg/apis/ironic/v1alpha1"
@@ -276,34 +277,16 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                             ImagePullPolicy: "IfNotPresent",
                             Env: []corev1.EnvVar {
                                 {
-                                    Name: "POD_NAME",
-                                    ValueFrom: &corev1.EnvVarSource {
-                                        FieldRef: &corev1.ObjectFieldSelector {
-                                            APIVersion: "v1",
-                                            FieldPath: "metadata.name",
-                                        },
-                                    },
-                                },
-                                {
-                                    Name: "NAMESPACE",
-                                    ValueFrom: &corev1.EnvVarSource {
-                                        FieldRef: &corev1.ObjectFieldSelector {
-                                            APIVersion: "v1",
-                                            FieldPath: "metadata.namespace",
-                                        },
-                                    },
-                                },
-                                {
                                     Name: "PATH",
                                     Value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/",
                                 },
                                 {
                                     Name: "DEPENDENCY_SERVICE",
-                                    Value: "default:ironic-api,default:rabbitmq",
+                                    Value: fmt.Sprintf("%s:ironic-api,%s:rabbitmq", m.Namespace, m.Namespace),
                                 },
                                 {
-                                    Name: "DEPENDENCY_JOBS",
-                                    Value: "ironic-db-sync,ironic-rabbit-init",
+                                    Name: "DEPENDENCY_JOBS_JSON",
+                                    Value: fmt.Sprintf("[{'namespace: '%s', 'name': 'ironic-db-sync'}, {'namespace': '%s', 'name': 'ironic-db-init'}]", m.Namespace, m.Namespace),
                                 },
                                 {
                                     Name: "COMMAND",
@@ -762,8 +745,8 @@ func (r *ReconcileIronicConductor) GetDbSyncJob(namespace string) *batchv1.Job {
                                     Value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/",
                                 },
                                 {
-                                    Name: "DEPENDENCY_JOBS",
-                                    Value: "ironic-db-init",
+                                    Name: "DEPENDENCY_JOBS_JSON",
+                                    Value: fmt.Sprintf("[{'namespace': '%s', 'name': 'ironic-db-init'}]", namespace),
                                 },
                                 {
                                     Name: "COMMAND",
