@@ -751,6 +751,28 @@ func (r *ReconcileIronicConductor) GetDbSyncJob(namespace string) *batchv1.Job {
                 Spec: corev1.PodSpec {
                     NodeSelector: node_selector,
                     RestartPolicy: "OnFailure",
+                    InitContainers: []corev1.Container {
+                        {
+                            Name: "init",
+                            Image: "quay.io/stackanetes/kubernetes-entrypoint:v0.3.1",
+                            ImagePullPolicy: "IfNotPresent",
+                            Env: []corev1.EnvVar {
+                                {
+                                    Name: "PATH",
+                                    Value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/",
+                                },
+                                {
+                                    Name: "DEPENDENCY_JOBS",
+                                    Value: "ironic-db-init",
+                                },
+                                {
+                                    Name: "COMMAND",
+                                    Value: "echo done",
+                                },
+                            },
+                            Command: []string { "kubernetes-entrypoint" },
+                        },
+                    },
                     Containers: []corev1.Container {
                         {
                             Name: "ironic-db-sync",
@@ -864,14 +886,14 @@ func (r *ReconcileIronicConductor) GetRabbitInitJob(namespace string) *batchv1.J
                                     ValueFrom: &corev1.EnvVarSource {
                                         SecretKeyRef: &corev1.SecretKeySelector {
                                             LocalObjectReference: corev1.LocalObjectReference {
-                                                Name: "ironic-rabbitmq-admin",
+                                                Name: "ironic-rabbitmq-user",
                                             },
                                             Key: "RABBITMQ_CONNECTION",
                                         },
                                     },
                                 },
                             },
-                            Command: []string { "/tmp/db-init.py" },
+                            Command: []string { "/tmp/rabbit-init.sh" },
                             VolumeMounts: []corev1.VolumeMount {
                                 {
                                     Name: "rabbit-init-sh",
