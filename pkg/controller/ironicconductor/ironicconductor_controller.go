@@ -281,10 +281,6 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                                     Value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/",
                                 },
                                 {
-                                    Name: "DEPENDENCY_SERVICE",
-                                    Value: fmt.Sprintf("%s:ironic-api,%s:rabbitmq", m.Namespace, m.Namespace),
-                                },
-                                {
                                     Name: "DEPENDENCY_JOBS_JSON",
                                     Value: fmt.Sprintf("[{'namespace: '%s', 'name': 'ironic-db-sync'}, {'namespace': '%s', 'name': 'ironic-db-init'}]", m.Namespace, m.Namespace),
                                 },

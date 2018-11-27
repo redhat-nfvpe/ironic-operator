@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: pxe-settings
+data:
+    PXE_NIC: eth0
+    CLUSTER_DOMAIN: "edge.testing"
+    INITIAL_IP_RANGE: "20"
+    FINAL_IP_RANGE: "200"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: dhcp-hosts
+data:
+    DHCP_HOSTS:
+        52:54:00:CC:CC:03
