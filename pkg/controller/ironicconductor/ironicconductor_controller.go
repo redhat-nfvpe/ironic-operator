@@ -325,6 +325,7 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                                     MountPath: "/tmp/pod-shared",
                                 },
                             },
+                            Command: []string { "/tmp/ironic-conductor-init.sh" },
                         },
                         {
                             Name: "ironic-conductor-http-init",
