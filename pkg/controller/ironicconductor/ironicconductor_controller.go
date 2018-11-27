@@ -313,6 +313,19 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                             Name: "ironic-conductor-init",
                             Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-conductor",
                             ImagePullPolicy: "IfNotPresent",
+                            Env: []corev1.EnvVar {
+                                {
+                                    Name: "PXE_NIC",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "pxe-settings",
+                                            },
+                                            Key: "PXE_NIC",
+                                        },
+                                    },
+                               },
+                            },
                             VolumeMounts: []corev1.VolumeMount {
                                 {
                                     Name: "ironic-bin",
