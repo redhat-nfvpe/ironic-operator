@@ -158,6 +158,21 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         reqLogger.Error(err, "failed to get db-sync job")
         return reconcile.Result{}, err
     }
+    job_rabbit_init_found := &batchv1.Job{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-rabbit-init", Namespace: instance.Namespace}, job_rabbit_init_found)
+    if err != nil && errors.IsNotFound(err) {
+        // define a new rabbit init job
+        job_rabbit_init := r.GetRabbitInitJob(instance.Namespace)
+        reqLogger.Info("Creating a new ironic-rabbit-init job", "Job.Namespace", job_rabbit_init.Namespace, "Job.Name", job_rabbit_init.Name)
+        err = r.client.Create(context.TODO(), job_rabbit_init)
+        if err != nil {
+            reqLogger.Error(err, "failed to create a new Job", "Job.Namespace", job_rabbit_init.Namespace, "Job.Name", job_rabbit_init.Name)
+            return reconcile.Result{}, err
+        }
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get rabbit-init job")
+        return reconcile.Result{}, err
+    }
 
     // Check if the deployment already exists, if not create a new one
     found := &appsv1.StatefulSet{}
@@ -793,6 +808,88 @@ func (r *ReconcileIronicConductor) GetDbSyncJob(namespace string) *batchv1.Job {
                                     DefaultMode: &readMode,
                                     LocalObjectReference: corev1.LocalObjectReference {
                                         Name: "ironic-etc",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    return job
+}
+
+func (r *ReconcileIronicConductor) GetRabbitInitJob(namespace string) *batchv1.Job {
+    node_selector := map[string]string{"ironic-control-plane": "enabled"}
+    var execMode int32 = 0555
+
+    job := &batchv1.Job{
+        TypeMeta: metav1.TypeMeta{
+            APIVersion: "batch/v1",
+            Kind:       "Job",
+        },
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      "ironic-rabbit-init",
+            Namespace: namespace,
+        },
+        Spec: batchv1.JobSpec {
+            Template: corev1.PodTemplateSpec{
+                ObjectMeta: metav1.ObjectMeta {
+                    Labels: map[string]string {"app": "ironic", "ironicapi_cr": "openstack-ironicapi", "component": "rabbit-init" },
+                },
+                Spec: corev1.PodSpec {
+                    NodeSelector: node_selector,
+                    RestartPolicy: "OnFailure",
+                    Containers: []corev1.Container {
+                        {
+                            Name: "rabbit-init",
+                            Image: "docker.io/rabbitmq:3.7-management",
+                            ImagePullPolicy: "IfNotPresent",
+                            Env: []corev1.EnvVar {
+                                {
+                                    Name: "RABBITMQ_ADMIN_CONNECTION",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        SecretKeyRef: &corev1.SecretKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "ironic-rabbitmq-admin",
+                                            },
+                                            Key: "RABBITMQ_CONNECTION",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "RABBITMQ_USER_CONNECTION",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        SecretKeyRef: &corev1.SecretKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "ironic-rabbitmq-admin",
+                                            },
+                                            Key: "RABBITMQ_CONNECTION",
+                                        },
+                                    },
+                                },
+                            },
+                            Command: []string { "/tmp/db-init.py" },
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "rabbit-init-sh",
+                                    MountPath: "/tmp/rabbit-init.sh",
+                                    SubPath: "rabbit-init.sh",
+                                    ReadOnly: true,
+                                },
+                            },
+                        },
+                    },
+                    Volumes: []corev1.Volume {
+                        {
+                            Name: "rabbit-init-sh",
+                            VolumeSource: corev1.VolumeSource {
+                                ConfigMap: &corev1.ConfigMapVolumeSource {
+                                    DefaultMode: &execMode,
+                                    LocalObjectReference: corev1.LocalObjectReference {
+                                        Name: "ironic-bin",
                                     },
                                 },
                             },
