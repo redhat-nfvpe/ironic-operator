@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+    "k8s.io/apimachinery/pkg/util/intstr"
     "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -128,6 +129,22 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         return reconcile.Result{}, err
     }
 
+    cm_dhcp_found := &corev1.ConfigMap{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-bin", Namespace: instance.Namespace}, cm_dhcp_found)
+    if err != nil && errors.IsNotFound(err) {
+        // define a new configmap
+        cm_dhcp, _ := helpers.GetDHCPConfigMap(instance.Namespace)
+        reqLogger.Info("Creating a new dhcp-bin configmap", "ConfigMap.Namespace", cm_dhcp.Namespace, "ConfigMap.Name", cm_dhcp.Name)
+        err = r.client.Create(context.TODO(), cm_dhcp)
+        if err != nil {
+            reqLogger.Error(err, "failed to create a new ConfigMap", "ConfigMap.Namespace", cm_dhcp.Namespace, "ConfigMap.Name", cm_dhcp.Name)
+            return reconcile.Result{}, err
+        }
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get dhcp-bin ConfigMap")
+        return reconcile.Result{}, err
+    }
+
     // create init jobs
     job_init_found := &batchv1.Job{}
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-db-init", Namespace: instance.Namespace}, job_init_found)
@@ -175,7 +192,41 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         return reconcile.Result{}, err
     }
 
-    // Check if the deployment already exists, if not create a new one
+    // Check if the dhcp service already exists, if not create a new one
+    dhcp_service_found := &corev1.Service{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-server", Namespace: instance.Namespace}, dhcp_service_found)
+    if err != nil && errors.IsNotFound(err) {
+        // Define a new dhcp service
+        dhcp_service := r.GetDHCPService(instance.Namespace)
+        reqLogger.Info("Creating a new DHCP service", "Service.Namespace", dhcp_service.Namespace, "StatefulSet.Name", dhcp_service.Name)
+        err = r.client.Create(context.TODO(), dhcp_service)
+        if err != nil {
+            reqLogger.Error(err, "failed to create new DHCP Service", "Service.Namespace", dhcp_service.Namespace, "Service.Name", dhcp_service.Name)
+            return reconcile.Result{}, err
+        }
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get dhcp service")
+        return reconcile.Result{}, err
+    }
+
+    // check if the DHCP deployment already exists, if not create a new one
+    dhcp_deployment_found := &appsv1.Deployment{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-server", Namespace: instance.Namespace}, dhcp_deployment_found)
+    if err != nil && errors.IsNotFound(err) {
+        // Define a new dhcp deployment
+        dhcp_deployment := r.GetDHCPDeployment(instance.Namespace)
+        reqLogger.Info("Creating a new DHCP deployment", "Deployment.Namespace", dhcp_deployment.Namespace, "Deployment.Name", dhcp_deployment.Name)
+        err = r.client.Create(context.TODO(), dhcp_deployment)
+        if err != nil {
+            reqLogger.Error(err, "failed to create new DHCP Deployment", "Deployment.Namespace", dhcp_deployment.Namespace, "Deployment.Name", dhcp_deployment.Name)
+            return reconcile.Result{}, err
+        }
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get dhcp deployment")
+        return reconcile.Result{}, err
+    }
+
+    // Check if the statefulset already exists, if not create a new one
     found := &appsv1.StatefulSet{}
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, found)
     if err != nil && errors.IsNotFound(err) {
@@ -836,6 +887,34 @@ func (r *ReconcileIronicConductor) GetDbSyncJob(namespace string) *batchv1.Job {
     return job
 }
 
+func (r *ReconcileIronicConductor) GetDHCPService(namespace string) *corev1.Service {
+    selector := map[string]string{"app": "dhcp-server"}
+
+    service := &corev1.Service{
+        TypeMeta: metav1.TypeMeta{
+            APIVersion: "v1",
+            Kind:       "Service",
+        },
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      "dhcp-server",
+            Namespace: namespace,
+        },
+        Spec: corev1.ServiceSpec {
+            Type: "ClusterIP",
+            Ports: []corev1.ServicePort {
+                {
+                    Name: "dhcp",
+                    Port: 67,
+                    Protocol: "UDP",
+                    TargetPort: intstr.FromInt(67),
+                },
+            },
+            Selector: selector,
+        },
+    }
+
+    return service
+}
 func (r *ReconcileIronicConductor) GetRabbitInitJob(namespace string) *batchv1.Job {
     node_selector := map[string]string{"ironic-control-plane": "enabled"}
     var execMode int32 = 0555
@@ -916,6 +995,184 @@ func (r *ReconcileIronicConductor) GetRabbitInitJob(namespace string) *batchv1.J
     }
 
     return job
+}
+
+func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.Deployment {
+    label_selector := map[string]string{"apps": "dhcp-server"}
+    var replicas int32 = 1
+    var readMode int32 = 0444
+    var execMode int32 = 0555
+
+    dep := &appsv1.Deployment {
+        TypeMeta: metav1.TypeMeta{
+            APIVersion: "apps/v1",
+            Kind:       "Deployment",
+        },
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      "dhcp-server",
+            Namespace: namespace,
+            Labels: label_selector,
+        },
+        Spec: appsv1.DeploymentSpec {
+            Replicas: &replicas,
+            Template: corev1.PodTemplateSpec {
+                Spec: corev1.PodSpec {
+                    HostNetwork: true,
+                    InitContainers: []corev1.Container {
+                        {
+                            Image: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo",
+                            ImagePullPolicy: "IfNotPresent",
+                            Command: []string {"/tmp/scripts/dhcp-server-init.sh"},
+                            Env: []corev1.EnvVar {
+                                {
+                                    Name: "PXE_NIC",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "pxe-settings",
+                                            },
+                                            Key: "PXE_NIC",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "DHCP_HOSTS",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "pxe-settings",
+                                            },
+                                            Key: "DHCP_HOSTS",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "CLUSTER_DOMAIN",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "pxe-settings",
+                                            },
+                                            Key: "CLUSTER_DOMAIN",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "INITIAL_IP_RANGE",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "pxe-settings",
+                                            },
+                                            Key: "INITIAL_IP_RANGE",
+                                        },
+                                    },
+                                },
+                                {
+                                    Name: "FINAL_IP_RANGE",
+                                    ValueFrom: &corev1.EnvVarSource {
+                                        ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
+                                            LocalObjectReference: corev1.LocalObjectReference {
+                                                Name: "pxe-settings",
+                                            },
+                                            Key: "FINAL_IP_RANGE",
+                                        },
+                                    },
+                                },
+                            },
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "dhcp-bin",
+                                    MountPath: "/tmp/scripts/",
+                                    ReadOnly: true,
+                                },
+                                {
+                                    Name: "dchp-hosts",
+                                    MountPath: "/data/hosts/",
+                                },
+                                {
+                                    Name: "dhcp-zones",
+                                    MountPath: "/data/zones/",
+                                },
+                            },
+                        },
+                    },
+                    Containers: []corev1.Container {
+                        {
+                            Name: "dhcp-server",
+                            Image: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo",
+                            ImagePullPolicy: "IfNotPresent",
+                            Command: []string { "/tmp/scripts/dhcp-server.sh" },
+                            Ports: []corev1.ContainerPort {
+                                {
+                                    ContainerPort: 67,
+                                    HostPort: 67,
+                                    Protocol: "UDP",
+                                },
+                            },
+                            VolumeMounts: []corev1.VolumeMount {
+                                {
+                                    Name: "dhcp-bin",
+                                    MountPath: "/tmp/scripts/",
+                                },
+                                {
+                                    Name: "dhcp-etc",
+                                    MountPath: "/data/dhcpd.conf",
+                                    SubPath: "mymounts/dhcpd.conf",
+                                },
+                                {
+                                    Name: "dhcp-zones",
+                                    MountPath: "/data/zones/",
+                                },
+                                {
+                                    Name: "dhcp-hosts",
+                                    MountPath: "/data/hosts/",
+                                },
+                            },
+                        },
+                    },
+                    Volumes: []corev1.Volume {
+                        {
+                            Name: "dhcp-bin",
+                            VolumeSource: corev1.VolumeSource {
+                                ConfigMap: &corev1.ConfigMapVolumeSource {
+                                    DefaultMode: &execMode,
+                                    LocalObjectReference: corev1.LocalObjectReference {
+                                        Name: "dhcp-bin",
+                                    },
+                                },
+                            },
+                        },
+                        {
+                            Name: "dhcp-etc",
+                            VolumeSource: corev1.VolumeSource {
+                                ConfigMap: &corev1.ConfigMapVolumeSource {
+                                    DefaultMode: &readMode,
+                                    LocalObjectReference: corev1.LocalObjectReference {
+                                        Name: "dhcp-etc",
+                                    },
+                                },
+                            },
+                        },
+                        {
+                            Name: "dhcp-hosts",
+                            VolumeSource: corev1.VolumeSource {
+                                EmptyDir: &corev1.EmptyDirVolumeSource {},
+                            },
+                        },
+                        {
+                            Name: "dhcp-zones",
+                            VolumeSource: corev1.VolumeSource {
+                                EmptyDir: &corev1.EmptyDirVolumeSource {},
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    return dep
 }
 
 // labelsForIronicConductor returns the labels for selecting the resources

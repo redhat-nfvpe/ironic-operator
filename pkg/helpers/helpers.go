@@ -122,3 +122,29 @@ func GetIronicEtcConfigMap(namespace string) (*v1.ConfigMap, error) {
     }
     return cm, nil
 }
+
+func GetDHCPConfigMap(namespace string) (*v1.ConfigMap, error) {
+    // read all bin scripts
+    box := packr.New("files", "../../files")
+
+    dhcp_init, err := box.FindString("dhcp_server_init.sh")
+    if err != nil {
+        log.Fatal(err)
+    }
+    dhcp_server, err := box.FindString("dhcp_server.sh")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    cm := &v1.ConfigMap{
+        ObjectMeta: metav1.ObjectMeta{
+            Name: "dhcp-bin",
+            Namespace: namespace,
+        },
+        Data: map[string]string{
+            "dhcp-server-init.sh": dhcp_init,
+            "dhcp-server.sh": dhcp_server,
+        },
+    }
+    return cm, nil
+}
