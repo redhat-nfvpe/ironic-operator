@@ -132,4 +132,4 @@ Please follow the [How to use documentation]
 [Ironic]: <https://wiki.openstack.org/wiki/Ironic>
 [Kubernetes operators]: <https://github.com/operator-framework/operator-sdk>
 [https://github.com/redhat-nfvpe/ironic-operator]: <https://github.com/redhat-nfvpe/ironic-operator>
-[How to use documentation]: <./doc/how-to-use.md>
+[How to use documentation]: <./docs/how-to-use.md>
