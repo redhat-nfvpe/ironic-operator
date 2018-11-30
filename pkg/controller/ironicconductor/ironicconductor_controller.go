@@ -145,6 +145,22 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         return reconcile.Result{}, err
     }
 
+    cm_dhcp_etc_found := &corev1.ConfigMap{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-etc", Namespace: instance.Namespace}, cm_dhcp_etc_found)
+    if err != nil && errors.IsNotFound(err) {
+        // define a new configmap
+        cm_dhcp_etc, _ := helpers.GetDHCPEtcConfigMap(instance.Namespace)
+        reqLogger.Info("Creating a new dhcp-etc configmap", "ConfigMap.Namespace", cm_dhcp_etc.Namespace, "ConfigMap.Name", cm_dhcp_etc.Name)
+        err = r.client.Create(context.TODO(), cm_dhcp_etc)
+        if err != nil {
+            reqLogger.Error(err, "failed to create a new ConfigMap", "ConfigMap.Namespace", cm_dhcp_etc.Namespace, "ConfigMap.Name", cm_dhcp_etc.Name)
+            return reconcile.Result{}, err
+        }
+    } else if err != nil {
+        reqLogger.Error(err, "failed to get dhcp-etc ConfigMap")
+        return reconcile.Result{}, err
+    }
+
     // create init jobs
     job_init_found := &batchv1.Job{}
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-db-init", Namespace: instance.Namespace}, job_init_found)
@@ -1011,15 +1027,21 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
         ObjectMeta: metav1.ObjectMeta{
             Name:      "dhcp-server",
             Namespace: namespace,
-            Labels: label_selector,
         },
         Spec: appsv1.DeploymentSpec {
             Replicas: &replicas,
+            Selector: &metav1.LabelSelector {
+                MatchLabels: label_selector,
+            },
             Template: corev1.PodTemplateSpec {
+                ObjectMeta: metav1.ObjectMeta {
+                    Labels: label_selector,
+                },
                 Spec: corev1.PodSpec {
                     HostNetwork: true,
                     InitContainers: []corev1.Container {
                         {
+                            Name: "init-dhcp",
                             Image: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo",
                             ImagePullPolicy: "IfNotPresent",
                             Command: []string {"/tmp/scripts/dhcp-server-init.sh"},
@@ -1040,7 +1062,7 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
                                     ValueFrom: &corev1.EnvVarSource {
                                         ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
                                             LocalObjectReference: corev1.LocalObjectReference {
-                                                Name: "pxe-settings",
+                                                Name: "dhcp-hosts",
                                             },
                                             Key: "DHCP_HOSTS",
                                         },
@@ -1087,7 +1109,7 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
                                     ReadOnly: true,
                                 },
                                 {
-                                    Name: "dchp-hosts",
+                                    Name: "dhcp-hosts",
                                     MountPath: "/data/hosts/",
                                 },
                                 {

@@ -146,5 +146,27 @@ func GetDHCPConfigMap(namespace string) (*v1.ConfigMap, error) {
             "dhcp-server.sh": dhcp_server,
         },
     }
+
+    return cm, nil
+}
+
+func GetDHCPEtcConfigMap(namespace string) (*v1.ConfigMap, error) {
+    // read all bin scripts
+    box := packr.New("files", "../../files")
+
+    dhcp_etc, err := box.FindString("dhcp.conf")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    cm := &v1.ConfigMap{
+        ObjectMeta: metav1.ObjectMeta{
+            Name: "dhcp-etc",
+            Namespace: namespace,
+        },
+        Data: map[string]string{
+            "dhcp-config": dhcp_etc,
+        },
+    }
     return cm, nil
 }
