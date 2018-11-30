@@ -62,10 +62,6 @@ func GetIronicBinConfigMap(namespace string) (*v1.ConfigMap, error) {
     if err != nil {
         log.Fatal(err)
     }
-    ironic_conductor_http_init, err := box.FindString("ironic_conductor_http_init.sh")
-    if err != nil {
-        log.Fatal(err)
-    }
     cm := &v1.ConfigMap{
         ObjectMeta: metav1.ObjectMeta{
             Name: "ironic-bin",
@@ -81,7 +77,6 @@ func GetIronicBinConfigMap(namespace string) (*v1.ConfigMap, error) {
             "ironic-conductor-pxe.sh": ironic_conductor_pxe,
             "ironic-conductor-pxe-init.sh": ironic_conductor_pxe_init,
             "ironic-conductor-http.sh": ironic_conductor_http,
-            "ironic-conductor-http-init.sh": ironic_conductor_http_init,
         },
     }
     return cm, nil

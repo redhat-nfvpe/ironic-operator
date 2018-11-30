@@ -407,43 +407,6 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                             },
                             Command: []string { "/tmp/ironic-conductor-init.sh" },
                         },
-                        {
-                            Name: "ironic-conductor-http-init",
-                            Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-conductor",
-                            ImagePullPolicy: "IfNotPresent",
-                            Env: []corev1.EnvVar {
-                                {
-                                    Name: "PXE_NIC",
-                                    ValueFrom: &corev1.EnvVarSource {
-                                        ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
-                                            LocalObjectReference: corev1.LocalObjectReference {
-                                                Name: "pxe-settings",
-                                            },
-                                            Key: "PXE_NIC",
-                                        },
-                                    },
-                                },
-                            },
-                            Command: []string { "/tmp/ironic-conductor-http-init.sh" },
-                            VolumeMounts: []corev1.VolumeMount {
-                                {
-                                    Name: "ironic-bin",
-                                    MountPath: "/tmp/ironic-conductor-http-init.sh",
-                                    SubPath: "ironic-conductor-http-init.sh",
-                                    ReadOnly: true,
-                                },
-                                {
-                                    Name: "ironic-etc",
-                                    MountPath: "/etc/nginx/nginx.conf",
-                                    SubPath: "nginx.conf",
-                                    ReadOnly: true,
-                                },
-                                {
-                                    Name: "pod-shared",
-                                    MountPath: "/tmp/pod-shared",
-                                },
-                            },
-                        },
                     },
                     Containers: []corev1.Container {
                         {
@@ -549,8 +512,10 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                                     ReadOnly: true,
                                 },
                                 {
-                                    Name: "pod-shared",
-                                    MountPath: "/tmp/pod-shared",
+                                    Name: "ironic-etc",
+                                    MountPath: "/etc/nginx/nginx.conf",
+                                    SubPath: "nginx.conf",
+                                    ReadOnly: true,
                                 },
                                 {
                                     Name: "pod-data",

@@ -35,4 +35,7 @@ tftp_server = ${PXE_IP}
 # http://192.1.2.3:8080 (string value)
 # from .deploy.ironic.http_url
 http_url = http://${PXE_IP}:8081
+
+[conductor]
+api_url = http://${PXE_IP}:32732
 EOF
