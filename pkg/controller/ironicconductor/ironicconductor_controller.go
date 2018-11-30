@@ -1140,7 +1140,7 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
                                 {
                                     Name: "dhcp-etc",
                                     MountPath: "/data/dhcpd.conf",
-                                    SubPath: "mymounts/dhcpd.conf",
+                                    SubPath: "dhcpd.conf",
                                 },
                                 {
                                     Name: "dhcp-zones",
@@ -1170,6 +1170,12 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
                             VolumeSource: corev1.VolumeSource {
                                 ConfigMap: &corev1.ConfigMapVolumeSource {
                                     DefaultMode: &readMode,
+                                    Items: []corev1.KeyToPath {
+                                        {
+                                           Key: "dhcp-config",
+                                           Path: "dhcpd.conf",
+                                       },
+                                    },
                                     LocalObjectReference: corev1.LocalObjectReference {
                                         Name: "dhcp-etc",
                                     },
