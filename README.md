@@ -12,7 +12,7 @@ In order to successfully deploy Ironic, you will need several requirements:
  - Label the node(s) where you are going to deploy Ironic with "ironic-control-plane=enabled"
  - Special permissions on your kubernetes cluster. The account that you are using to run [Ironic] operator on it, needs to have following permissions:
 
-```sh  
+```sh
     - '{"allowHostDirVolumePlugin": true}'
     - '{"allowHostNetwork": true}'
     - '{"allowHostIPC": true}'
@@ -25,11 +25,11 @@ In order to successfully deploy Ironic, you will need several requirements:
     - '{"volumes": ["configMap", "downwardAPI", "emptyDir", "hostPath", "persistentVolumeClaim", "projected", "secret", "nfs"]}'
  ```
   - TEMPORARY: If you are deploying on systems with selinux enabled, please set it to permissive. This won't be needed in the future
-  
+
 # Installation
 Once you are in a cluster, clone the [Ironic] operator from [https://github.com/redhat-nfvpe/ironic-operator] . After that, you need to use the manifests on the deploy folder:
 
-```sh  
+```sh
 kubectl apply -f crds/ironic_v1alpha1_ironicapi_crd.yaml
 kubectl apply -f crds/ironic_v1alpha1_ironicconductor_crd.yaml
 kubectl apply -f service_account.yaml
@@ -51,7 +51,7 @@ The operator comes with two different files that are going to be used to configu
   - mysql-root-credentials: these are the settings to connect to the existing MySQL cluster with root permissions. These settings will be used to create the new Ironic account, that will be the one used by the operator. You need to pass ROOT_DB_HOST, ROOT_DB_USER and ROOT_DB_PASSWORD in Opaque format.
   - ironic-rabbitmq-admin: this is the connection to access to the existing RabbitMQ cluster with root access. It will be used to create an ironic account, that will be used by the operator. You need to pass the whole RABBITMQ_CONNECTION in Opaque format.
   - ironic-rabbitmq-user: this is the connection string used for ironic to access the Rabbit cluster. This will be created by the operator. You need to pass the whole RABBITMQ_CONNECTION in Opaque format.
- 
+
 The secrets are stored in `Opaque` format , you can achieve it by just executing
 ```sh
 echo 'content-of-the-secret' | base64
@@ -100,7 +100,7 @@ data:
   - PXE_NIC: eth0 . This will be the nic used for PXE booting in the DHCP server created for Ironic
   - CLUSTER_DOMAIN: it needs to match the domain for your Kubernetes cluster, in order for DNS to work
   - INITIAL_IP_RANGE, FINAL_IP_RANGE: It will take network CIDR from the PXE_NIC definition, but this will limit the range of IPS to be assigned for DHCP in PXE boot.
- 
+
   Second one, dhcp-hosts, will contain just a DHCP_HOSTS list, that need to match all the MACs for the server that you want to provision with this ironic operator. It is used to don't add PXE boot to all the servers in the system, but just to the ones that we are interested on.
 
 ```sh
@@ -125,6 +125,11 @@ data:
 
 ```
 
+# How to use
+
+Please follow the [How to use documentation]
+
 [Ironic]: <https://wiki.openstack.org/wiki/Ironic>
 [Kubernetes operators]: <https://github.com/operator-framework/operator-sdk>
 [https://github.com/redhat-nfvpe/ironic-operator]: <https://github.com/redhat-nfvpe/ironic-operator>
+[How to use documentation]: <./doc/how-to-use.md>
