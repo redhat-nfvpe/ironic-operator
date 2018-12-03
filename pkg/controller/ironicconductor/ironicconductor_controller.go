@@ -4,6 +4,7 @@ import (
 	"context"
     "fmt"
     "reflect"
+    "strconv"
 
 	ironicv1alpha1 "github.com/redhat-nfvpe/ironic-operator/pkg/apis/ironic/v1alpha1"
     helpers "github.com/redhat-nfvpe/ironic-operator/pkg/helpers"
@@ -208,38 +209,46 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         return reconcile.Result{}, err
     }
 
-    // Check if the dhcp service already exists, if not create a new one
-    dhcp_service_found := &corev1.Service{}
-    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-server", Namespace: instance.Namespace}, dhcp_service_found)
-    if err != nil && errors.IsNotFound(err) {
-        // Define a new dhcp service
-        dhcp_service := r.GetDHCPService(instance.Namespace)
-        reqLogger.Info("Creating a new DHCP service", "Service.Namespace", dhcp_service.Namespace, "StatefulSet.Name", dhcp_service.Name)
-        err = r.client.Create(context.TODO(), dhcp_service)
-        if err != nil {
-            reqLogger.Error(err, "failed to create new DHCP Service", "Service.Namespace", dhcp_service.Namespace, "Service.Name", dhcp_service.Name)
+    // deploy DHCP only if needed
+    dhcp_settings := &corev1.ConfigMap{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-settings", Namespace: instance.Namespace}, dhcp_settings)
+    external_dhcp, _ := strconv.ParseBool(dhcp_settings.Data["EXTERNAL_DHCP"])
+    if (! external_dhcp) {
+        // Check if the dhcp service already exists, if not create a new one
+        dhcp_service_found := &corev1.Service{}
+        err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-server", Namespace: instance.Namespace}, dhcp_service_found)
+        if err != nil && errors.IsNotFound(err) {
+            // Define a new dhcp service
+            dhcp_service := r.GetDHCPService(instance.Namespace)
+            reqLogger.Info("Creating a new DHCP service", "Service.Namespace", dhcp_service.Namespace, "StatefulSet.Name", dhcp_service.Name)
+            err = r.client.Create(context.TODO(), dhcp_service)
+            if err != nil {
+                reqLogger.Error(err, "failed to create new DHCP Service", "Service.Namespace", dhcp_service.Namespace, "Service.Name", dhcp_service.Name)
+                return reconcile.Result{}, err
+            }
+        } else if err != nil {
+            reqLogger.Error(err, "failed to get dhcp service")
             return reconcile.Result{}, err
         }
-    } else if err != nil {
-        reqLogger.Error(err, "failed to get dhcp service")
-        return reconcile.Result{}, err
-    }
 
-    // check if the DHCP deployment already exists, if not create a new one
-    dhcp_deployment_found := &appsv1.Deployment{}
-    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-server", Namespace: instance.Namespace}, dhcp_deployment_found)
-    if err != nil && errors.IsNotFound(err) {
-        // Define a new dhcp deployment
-        dhcp_deployment := r.GetDHCPDeployment(instance.Namespace)
-        reqLogger.Info("Creating a new DHCP deployment", "Deployment.Namespace", dhcp_deployment.Namespace, "Deployment.Name", dhcp_deployment.Name)
-        err = r.client.Create(context.TODO(), dhcp_deployment)
-        if err != nil {
-            reqLogger.Error(err, "failed to create new DHCP Deployment", "Deployment.Namespace", dhcp_deployment.Namespace, "Deployment.Name", dhcp_deployment.Name)
+        // check if the DHCP deployment already exists, if not create a new one
+        dhcp_deployment_found := &appsv1.Deployment{}
+        err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-server", Namespace: instance.Namespace}, dhcp_deployment_found)
+        if err != nil && errors.IsNotFound(err) {
+            // Define a new dhcp deployment
+            dhcp_deployment := r.GetDHCPDeployment(instance.Namespace)
+            reqLogger.Info("Creating a new DHCP deployment", "Deployment.Namespace", dhcp_deployment.Namespace, "Deployment.Name", dhcp_deployment.Name)
+            err = r.client.Create(context.TODO(), dhcp_deployment)
+            if err != nil {
+                reqLogger.Error(err, "failed to create new DHCP Deployment", "Deployment.Namespace", dhcp_deployment.Namespace, "Deployment.Name", dhcp_deployment.Name)
+                return reconcile.Result{}, err
+            }
+        } else if err != nil {
+            reqLogger.Error(err, "failed to get dhcp deployment")
             return reconcile.Result{}, err
         }
-    } else if err != nil {
-        reqLogger.Error(err, "failed to get dhcp deployment")
-        return reconcile.Result{}, err
+    } else {
+        reqLogger.Info("Skipping DHCP creation, as an external one will be used")
     }
 
     // Check if the statefulset already exists, if not create a new one
@@ -1027,7 +1036,7 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
                                     ValueFrom: &corev1.EnvVarSource {
                                         ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
                                             LocalObjectReference: corev1.LocalObjectReference {
-                                                Name: "dhcp-hosts",
+                                                Name: "dhcp-settings",
                                             },
                                             Key: "DHCP_HOSTS",
                                         },
@@ -1038,7 +1047,7 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
                                     ValueFrom: &corev1.EnvVarSource {
                                         ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
                                             LocalObjectReference: corev1.LocalObjectReference {
-                                                Name: "pxe-settings",
+                                                Name: "dhcp-settings",
                                             },
                                             Key: "CLUSTER_DOMAIN",
                                         },
@@ -1049,7 +1058,7 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
                                     ValueFrom: &corev1.EnvVarSource {
                                         ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
                                             LocalObjectReference: corev1.LocalObjectReference {
-                                                Name: "pxe-settings",
+                                                Name: "dhcp-settings",
                                             },
                                             Key: "INITIAL_IP_RANGE",
                                         },
@@ -1060,7 +1069,7 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
                                     ValueFrom: &corev1.EnvVarSource {
                                         ConfigMapKeyRef: &corev1.ConfigMapKeySelector {
                                             LocalObjectReference: corev1.LocalObjectReference {
-                                                Name: "pxe-settings",
+                                                Name: "dhcp-settings",
                                             },
                                             Key: "FINAL_IP_RANGE",
                                         },
