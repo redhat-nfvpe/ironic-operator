@@ -2,11 +2,15 @@
 set -ex
 
 # strip hosts in lines and output content
-COUNTER=1
-while read -r line; do
-  echo "host host${COUNTER} { hardware ethernet ${line}; }" >> /data/hosts/hosts.conf
-  COUNTER=$[$COUNTER+1]
-done <<< "${DHCP_HOSTS}"
+if [[ ! -z $DHCP_HOSTS ]]; then
+    echo "deny unknown-clients;" >> /data/hosts/hosts.conf
+
+    COUNTER=1
+    while read -r line; do
+      echo "host host${COUNTER} { hardware ethernet ${line}; }" >> /data/hosts/hosts.conf
+      COUNTER=$[$COUNTER+1]
+    done <<< "${DHCP_HOSTS}"
+fi
 
 # now generate the entry for the zone
 if [ "x" == "x${PXE_NIC}" ]; then
@@ -33,7 +37,6 @@ subnet ${SUBNET} netmask 255.255.255.0 {
   option domain-name-servers ${PXE_IP};
   option domain-name "${CLUSTER_DOMAIN}";
   range dynamic-bootp ${IP_FRAGMENT}.${INITIAL_IP_RANGE} ${IP_FRAGMENT}.${FINAL_IP_RANGE};
-  deny unknown-clients;
   default-lease-time 21600;
   max-lease-time 43200;
 
