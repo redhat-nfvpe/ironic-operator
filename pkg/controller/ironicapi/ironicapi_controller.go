@@ -114,7 +114,7 @@ func (r *ReconcileIronicApi) Reconcile(request reconcile.Request) (reconcile.Res
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-etc", Namespace: instance.Namespace}, cm_etc_found)
     if err != nil && errors.IsNotFound(err) {
         // define a new configmap
-        cm_etc, _ := helpers.GetIronicEtcConfigMap(instance.Namespace)
+        cm_etc, _ := helpers.GetIronicEtcConfigMap(instance.Namespace, r.client)
         reqLogger.Info("Creating a new ironic-etc configmap", "ConfigMap.Namespace", cm_etc.Namespace, "ConfigMap.Name", cm_etc.Name)
         err = r.client.Create(context.TODO(), cm_etc)
         if err != nil {

@@ -15,11 +15,16 @@
 package helpers
 
 import (
+    "context"
+    "fmt"
     "log"
+    "strings"
     packr "github.com/gobuffalo/packr/v2"
 
     v1 "k8s.io/api/core/v1"
+    "k8s.io/apimachinery/pkg/types"
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func GetIronicBinConfigMap(namespace string) (*v1.ConfigMap, error) {
@@ -82,7 +87,7 @@ func GetIronicBinConfigMap(namespace string) (*v1.ConfigMap, error) {
     return cm, nil
 }
 
-func GetIronicEtcConfigMap(namespace string) (*v1.ConfigMap, error) {
+func GetIronicEtcConfigMap(namespace string, client client.Client) (*v1.ConfigMap, error) {
     // read all bin scripts
     box := packr.New("files", "../../files")
 
@@ -102,6 +107,18 @@ func GetIronicEtcConfigMap(namespace string) (*v1.ConfigMap, error) {
     if err != nil {
         log.Fatal(err)
     }
+
+    // get rabbit secret
+    rabbit_secret := &v1.Secret{}
+    err = client.Get(context.TODO(), types.NamespacedName{Name: "ironic-rabbitmq-user", Namespace: namespace}, rabbit_secret)
+    ironic_conf = strings.Replace(ironic_conf, "##RABBIT_CONNECTION##", string(rabbit_secret.Data["RABBITMQ_CONNECTION"]), -1)
+
+    // get mysql secret
+    mysql_secret := &v1.Secret{}
+    err = client.Get(context.TODO(), types.NamespacedName{Name: "ironic-db-user", Namespace: namespace}, mysql_secret)
+    mysql_connection_string := fmt.Sprintf("mysql+pymysql://%s:%s@%s:3306/%s?charset=utf8mb4", mysql_secret.Data["DB_USER"],
+        mysql_secret.Data["DB_PASSWORD"], mysql_secret.Data["DB_HOST"], mysql_secret.Data["DB_DATABASE"])
+    ironic_conf = strings.Replace(ironic_conf, "##MYSQL_CONNECTION##", mysql_connection_string, -1)
 
     cm := &v1.ConfigMap{
         ObjectMeta: metav1.ObjectMeta{
