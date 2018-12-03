@@ -11,7 +11,7 @@ kind: ConfigMap
 metadata:
     name: dhcp-settings
 data:
-    USE_EXTERNAL_DHCP: False
+    USE_EXTERNAL_DHCP: "False"
     CLUSTER_DOMAIN: "edge.testing"
     INITIAL_IP_RANGE: "20"
     FINAL_IP_RANGE: "200"
