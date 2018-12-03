@@ -111,7 +111,8 @@ func GetIronicEtcConfigMap(namespace string, client client.Client) (*v1.ConfigMa
     // get rabbit secret
     rabbit_secret := &v1.Secret{}
     err = client.Get(context.TODO(), types.NamespacedName{Name: "ironic-rabbitmq-user", Namespace: namespace}, rabbit_secret)
-    ironic_conf = strings.Replace(ironic_conf, "##RABBIT_CONNECTION##", string(rabbit_secret.Data["RABBITMQ_CONNECTION"]), -1)
+    ironic_conf = strings.Replace(ironic_conf, "##RABBIT_CONNECTION##", string(rabbit_secret.Data["RABBITMQ_TRANSPORT"]), -1)
+
 
     // get mysql secret
     mysql_secret := &v1.Secret{}
