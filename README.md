@@ -101,7 +101,7 @@ data:
   - CLUSTER_DOMAIN: it needs to match the domain for your Kubernetes cluster, in order for DNS to work
   - INITIAL_IP_RANGE, FINAL_IP_RANGE: It will take network CIDR from the PXE_NIC definition, but this will limit the range of IPS to be assigned for DHCP in PXE boot.
 
-  Second one, dhcp-hosts, will contain just a DHCP_HOSTS list, that need to match all the MACs for the server that you want to provision with this ironic operator. It is used to don't add PXE boot to all the servers in the system, but just to the ones that we are interested on.
+  Second one, dhcp-hosts, will contain just a DHCP_HOSTS list, that need to match all the MACs for the server that you want to provision with this ironic operator. It is used to don't add PXE boot to all the servers in the system, but just to the ones that we are interested on. If you don't want to limit by hosts, just set `DHCP_HOSTS: ""`
 
 ```sh
 ---

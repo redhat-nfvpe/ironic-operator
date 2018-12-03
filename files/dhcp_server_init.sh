@@ -10,6 +10,8 @@ if [[ ! -z $DHCP_HOSTS ]]; then
       echo "host host${COUNTER} { hardware ethernet ${line}; }" >> /data/hosts/hosts.conf
       COUNTER=$[$COUNTER+1]
     done <<< "${DHCP_HOSTS}"
+else
+    touch /data/hosts/hosts.conf
 fi
 
 # now generate the entry for the zone
