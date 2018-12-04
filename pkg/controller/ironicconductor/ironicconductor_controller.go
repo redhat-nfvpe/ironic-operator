@@ -162,12 +162,16 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         return reconcile.Result{}, err
     }
 
+    // retrieve entries in configmap for images
+    cm_images := &corev1.ConfigMap{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "images", Namespace: instance.Namespace}, cm_images)
+
     // create init jobs
     job_init_found := &batchv1.Job{}
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-db-init", Namespace: instance.Namespace}, job_init_found)
     if err != nil && errors.IsNotFound(err) {
         // define a new db init job
-        job_init := r.GetDbInitJob(instance.Namespace)
+        job_init := r.GetDbInitJob(instance.Namespace, cm_images.Data)
         reqLogger.Info("Creating a new ironic-db-init job", "Job.Namespace", job_init.Namespace, "Job.Name", job_init.Name)
         err = r.client.Create(context.TODO(), job_init)
         if err != nil {
@@ -182,7 +186,7 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-db-sync", Namespace: instance.Namespace}, job_db_sync_found)
     if err != nil && errors.IsNotFound(err) {
         // define a new db sync job
-        job_db_sync := r.GetDbSyncJob(instance.Namespace)
+        job_db_sync := r.GetDbSyncJob(instance.Namespace, cm_images.Data)
         reqLogger.Info("Creating a new ironic-db-sync job", "Job.Namespace", job_db_sync.Namespace, "Job.Name", job_db_sync.Name)
         err = r.client.Create(context.TODO(), job_db_sync)
         if err != nil {
@@ -197,7 +201,7 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-rabbit-init", Namespace: instance.Namespace}, job_rabbit_init_found)
     if err != nil && errors.IsNotFound(err) {
         // define a new rabbit init job
-        job_rabbit_init := r.GetRabbitInitJob(instance.Namespace)
+        job_rabbit_init := r.GetRabbitInitJob(instance.Namespace, cm_images.Data)
         reqLogger.Info("Creating a new ironic-rabbit-init job", "Job.Namespace", job_rabbit_init.Namespace, "Job.Name", job_rabbit_init.Name)
         err = r.client.Create(context.TODO(), job_rabbit_init)
         if err != nil {
@@ -212,7 +216,7 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
     // deploy DHCP only if needed
     dhcp_settings := &corev1.ConfigMap{}
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-settings", Namespace: instance.Namespace}, dhcp_settings)
-    external_dhcp, _ := strconv.ParseBool(dhcp_settings.Data["EXTERNAL_DHCP"])
+    external_dhcp, _ := strconv.ParseBool(dhcp_settings.Data["USE_EXTERNAL_DHCP"])
     if (! external_dhcp) {
         // Check if the dhcp service already exists, if not create a new one
         dhcp_service_found := &corev1.Service{}
@@ -236,7 +240,7 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
         err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-server", Namespace: instance.Namespace}, dhcp_deployment_found)
         if err != nil && errors.IsNotFound(err) {
             // Define a new dhcp deployment
-            dhcp_deployment := r.GetDHCPDeployment(instance.Namespace)
+            dhcp_deployment := r.GetDHCPDeployment(instance.Namespace, cm_images.Data)
             reqLogger.Info("Creating a new DHCP deployment", "Deployment.Namespace", dhcp_deployment.Namespace, "Deployment.Name", dhcp_deployment.Name)
             err = r.client.Create(context.TODO(), dhcp_deployment)
             if err != nil {
@@ -256,7 +260,7 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, found)
     if err != nil && errors.IsNotFound(err) {
         // Define a new stateful set
-        sta := r.statefulSetForIronicConductor(instance)
+        sta := r.statefulSetForIronicConductor(instance, cm_images.Data)
         reqLogger.Info("Creating a new StatefulSet", "StatefulSet.Namespace", sta.Namespace, "StatefulSet.Name", sta.Name)
         err = r.client.Create(context.TODO(), sta)
         if err != nil {
@@ -309,7 +313,7 @@ func (r *ReconcileIronicConductor) Reconcile(request reconcile.Request) (reconci
 }
 
 // statefulSetForIronicConductor returns a ironic-conductor StatefulSet object
-func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alpha1.IronicConductor) *appsv1.StatefulSet {
+func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alpha1.IronicConductor, images map[string]string) *appsv1.StatefulSet {
     ls := labelsForIronicConductor(m.Name)
     replicas := m.Spec.Size
 
@@ -349,7 +353,7 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                     InitContainers: []corev1.Container{
                         {
                             Name: "init",
-                            Image: "quay.io/stackanetes/kubernetes-entrypoint:v0.3.1",
+                            Image: images["KUBERNETES_ENTRYPOINT"],
                             ImagePullPolicy: "IfNotPresent",
                             Env: []corev1.EnvVar {
                                 {
@@ -369,7 +373,7 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                         },
                         {
                             Name: "ironic-conductor-pxe-init",
-                            Image: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo",
+                            Image: images["IRONIC_PXE"],
                             ImagePullPolicy: "IfNotPresent",
                             Command: []string { "/tmp/ironic-conductor-pxe-init.sh" },
                             VolumeMounts: []corev1.VolumeMount {
@@ -387,7 +391,7 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                         },
                         {
                             Name: "ironic-conductor-init",
-                            Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-conductor",
+                            Image: images["IRONIC_CONDUCTOR"],
                             ImagePullPolicy: "IfNotPresent",
                             Env: []corev1.EnvVar {
                                 {
@@ -420,7 +424,7 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                     Containers: []corev1.Container {
                         {
                             Name: "ironic-conductor",
-                            Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-conductor",
+                            Image: images["IRONIC_CONDUCTOR"],
                             ImagePullPolicy: "IfNotPresent",
                             SecurityContext: &corev1.SecurityContext {
                                 Privileged: &privTrue,
@@ -462,7 +466,7 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                         },
                         {
                             Name: "ironic-conductor-pxe",
-                            Image: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo",
+                            Image: images["IRONIC_PXE"],
                             ImagePullPolicy: "IfNotPresent",
                             SecurityContext: &corev1.SecurityContext {
                                 Privileged: &privTrue,
@@ -510,7 +514,7 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
                         },
                         {
                             Name: "ironic-conductor-http",
-                            Image: "docker.io/nginx:1.13.3",
+                            Image: images["NGINX"],
                             ImagePullPolicy: "IfNotPresent",
                             Command: []string { "/tmp/ironic-conductor-http.sh" },
                             VolumeMounts: []corev1.VolumeMount {
@@ -591,7 +595,7 @@ func (r *ReconcileIronicConductor) statefulSetForIronicConductor(m *ironicv1alph
     return sta
 }
 
-func (r *ReconcileIronicConductor) GetDbInitJob(namespace string) *batchv1.Job {
+func (r *ReconcileIronicConductor) GetDbInitJob(namespace string, images map[string]string) *batchv1.Job {
     node_selector := map[string]string{"ironic-control-plane": "enabled"}
     var readMode int32 = 0444
     var execMode int32 = 0555
@@ -616,7 +620,7 @@ func (r *ReconcileIronicConductor) GetDbInitJob(namespace string) *batchv1.Job {
                     Containers: []corev1.Container {
                         {
                             Name: "ironic-db-init-0",
-                            Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-api",
+                            Image: images["IRONIC_API"],
                             ImagePullPolicy: "IfNotPresent",
                             Env: []corev1.EnvVar {
                                 {
@@ -763,7 +767,7 @@ func (r *ReconcileIronicConductor) GetDbInitJob(namespace string) *batchv1.Job {
     return job
 }
 
-func (r *ReconcileIronicConductor) GetDbSyncJob(namespace string) *batchv1.Job {
+func (r *ReconcileIronicConductor) GetDbSyncJob(namespace string, images map[string]string) *batchv1.Job {
     node_selector := map[string]string{"ironic-control-plane": "enabled"}
     var readMode int32 = 0444
     var execMode int32 = 0555
@@ -788,7 +792,7 @@ func (r *ReconcileIronicConductor) GetDbSyncJob(namespace string) *batchv1.Job {
                     InitContainers: []corev1.Container {
                         {
                             Name: "init",
-                            Image: "quay.io/stackanetes/kubernetes-entrypoint:v0.3.1",
+                            Image: images["KUBERNETES_ENTRYPOINT"],
                             ImagePullPolicy: "IfNotPresent",
                             Env: []corev1.EnvVar {
                                 {
@@ -810,7 +814,7 @@ func (r *ReconcileIronicConductor) GetDbSyncJob(namespace string) *batchv1.Job {
                     Containers: []corev1.Container {
                         {
                             Name: "ironic-db-sync",
-                            Image: "quay.io/yrobla/tripleorocky-centos-binary-ironic-api",
+                            Image: images["IRONIC_API"],
                             ImagePullPolicy: "IfNotPresent",
                             Command: []string { "/tmp/db-sync.sh" },
                             VolumeMounts: []corev1.VolumeMount {
@@ -905,7 +909,7 @@ func (r *ReconcileIronicConductor) GetDHCPService(namespace string) *corev1.Serv
 
     return service
 }
-func (r *ReconcileIronicConductor) GetRabbitInitJob(namespace string) *batchv1.Job {
+func (r *ReconcileIronicConductor) GetRabbitInitJob(namespace string, images map[string]string) *batchv1.Job {
     node_selector := map[string]string{"ironic-control-plane": "enabled"}
     var execMode int32 = 0555
 
@@ -929,7 +933,7 @@ func (r *ReconcileIronicConductor) GetRabbitInitJob(namespace string) *batchv1.J
                     Containers: []corev1.Container {
                         {
                             Name: "rabbit-init",
-                            Image: "docker.io/rabbitmq:3.7-management",
+                            Image: images["RABBIT_MANAGEMENT"],
                             ImagePullPolicy: "IfNotPresent",
                             Env: []corev1.EnvVar {
                                 {
@@ -987,7 +991,7 @@ func (r *ReconcileIronicConductor) GetRabbitInitJob(namespace string) *batchv1.J
     return job
 }
 
-func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.Deployment {
+func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string, images map[string]string) *appsv1.Deployment {
     label_selector := map[string]string{"apps": "dhcp-server"}
     var replicas int32 = 1
     var readMode int32 = 0444
@@ -1016,7 +1020,7 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
                     InitContainers: []corev1.Container {
                         {
                             Name: "init-dhcp",
-                            Image: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo",
+                            Image: images["IRONIC_PXE"],
                             ImagePullPolicy: "IfNotPresent",
                             Command: []string {"/tmp/scripts/dhcp-server-init.sh"},
                             Env: []corev1.EnvVar {
@@ -1096,7 +1100,7 @@ func (r *ReconcileIronicConductor) GetDHCPDeployment(namespace string) *appsv1.D
                     Containers: []corev1.Container {
                         {
                             Name: "dhcp-server",
-                            Image: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo",
+                            Image: images["IRONIC_PXE"],
                             ImagePullPolicy: "IfNotPresent",
                             Command: []string { "/tmp/scripts/dhcp-server.sh" },
                             Ports: []corev1.ContainerPort {

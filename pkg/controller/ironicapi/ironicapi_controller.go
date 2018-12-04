@@ -126,12 +126,16 @@ func (r *ReconcileIronicApi) Reconcile(request reconcile.Request) (reconcile.Res
         return reconcile.Result{}, err
     }
 
+    // retrieve entries in configmap for images
+    cm_images := &corev1.ConfigMap{}
+    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "images", Namespace: instance.Namespace}, cm_images)
+
 	// Check if the deployment already exists, if not create a new one
 	found := &appsv1.Deployment{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new deployment
-		dep := r.deploymentForIronicApi(instance)
+		dep := r.deploymentForIronicApi(instance, cm_images.Data)
 		reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 		err = r.client.Create(context.TODO(), dep)
 		if err != nil {
@@ -205,7 +209,7 @@ func (r *ReconcileIronicApi) Reconcile(request reconcile.Request) (reconcile.Res
 }
 
 // deploymentForIronicApi returns a ironic-api Deployment object
-func (r *ReconcileIronicApi) deploymentForIronicApi(m *ironicv1alpha1.IronicApi) *appsv1.Deployment {
+func (r *ReconcileIronicApi) deploymentForIronicApi(m *ironicv1alpha1.IronicApi, images map[string]string) *appsv1.Deployment {
 	ls := labelsForIronicApi(m.Name)
 	replicas := m.Spec.Size
 
@@ -232,7 +236,7 @@ func (r *ReconcileIronicApi) deploymentForIronicApi(m *ironicv1alpha1.IronicApi)
 				},
 				Spec: corev1.PodSpec{
                     InitContainers: []corev1.Container{{
-                        Image: "quay.io/stackanetes/kubernetes-entrypoint:v0.3.1",
+                        Image: images["KUBERNETES_ENTRYPOINT"],
                         Name: "init",
                         ImagePullPolicy: "IfNotPresent",
                         Env: []corev1.EnvVar{
@@ -253,9 +257,6 @@ func (r *ReconcileIronicApi) deploymentForIronicApi(m *ironicv1alpha1.IronicApi)
                                     },
                                 },
                             }, {
-                                Name: "INTERFACE_NAME",
-                                Value: "eth0",
-                            }, {
                                 Name: "PATH",
                                 Value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/",
                             }, {
@@ -266,7 +267,7 @@ func (r *ReconcileIronicApi) deploymentForIronicApi(m *ironicv1alpha1.IronicApi)
                         Command: []string{"kubernetes-entrypoint"},
                     }},
 					Containers: []corev1.Container{{
-						Image:   "quay.io/yrobla/tripleorocky-centos-binary-ironic-api",
+						Image:   images["IRONIC_API"],
 						Name:    "ironic-api",
                         ImagePullPolicy: "IfNotPresent",
 						Command: []string{"/tmp/ironic-api.sh", "start"},
