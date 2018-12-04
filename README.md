@@ -97,37 +97,22 @@ data:
   RABBITMQ_CONNECTION: cmFiYml0Oi8vaXJvbmljOnBhc3N3b3JkQHJhYmJpdG1xOjE1NjcyL2lyb25pYw==  # rabbit://ironic:password@rabbitmq:15672/ironic
   RABBITMQ_TRANSPORT: cmFiYml0Oi8vaXJvbmljOnBhc3N3b3JkQHJhYmJpdG1xOjU2NzIvaXJvbmljCg==  # rabbit://ironic:password@rabbitmq:5672/ironic
 ```
-* `settings.yaml`: It contains two different ConfigMaps with settings that can be adjusted for your environment. First one, `pxe-settings` is used to define the NIC settings for PXE boot: You will need to provide:
+* `settings.yaml`: It contains different ConfigMaps with settings that can be adjusted for your environment. First one, `images` will allow to define the images that will be used on the deployment. Several ones will be used, and those can be updated but making sure that the selected images are a valid replace for the default ones:
+  - KUBERNETES_ENTRYPOINT: image used to control when a pod is started to be deployed, or needs to wait for other conditions to happen.
+  - IRONIC_API: image used to deploy Ironic API, contains basic ironic dependencies and openstack/ironic clients.
+  - IRONIC_CONDUCTOR: image used to deploy the Ironic conductor.
+  - IRONIC_PXE: image used for the PXE boot, containts dependencies for PXE and TFTP.
+  - NGINX: image used to deploy a basic Nginx container to hold static content.
+  - RABBIT_MANAGEMENT: image used to manage rabbit credentials, contains rabbitmq clients.
+
+  Second one, `pxe-settings` is used to define the NIC settings for PXE boot: You will need to provide:
   - PXE_NIC: eth0 . This will be the nic used for PXE booting in the DHCP server created for Ironic
 
-  Second one, dhcp-settings, will contain the settings to control the DHCP service. You will need to provide:
+  Third one, dhcp-settings, will contain the settings to control the DHCP service. You will need to provide:
   - USE_EXTERNAL_DHCP: boolean. Set to True if you are going to use an external DHCP server, so it will skip the deployment of the internal one.
   - CLUSTER_DOMAIN: it needs to match the domain for your Kubernetes cluster, in order for DNS to work
   - INITIAL_IP_RANGE, FINAL_IP_RANGE: It will take network CIDR from the PXE_NIC definition, but this will limit the range of IPS to be assigned for DHCP in PXE boot.
   - DHCP_HOSTS: list that need to match all the MACs for the server that you want to provision with this ironic operator. It is used to don't add PXE boot to all the servers in the system, but just to the ones that we are interested on. If you don't want to limit by hosts, just set `DHCP_HOSTS: ""`
-
-```sh
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-    name: pxe-settings
-data:
-    PXE_NIC: eth0
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-    name: dhcp-settings
-data:
-    USE_EXTERNAL_DHCP: False
-    CLUSTER_DOMAIN: "edge.testing"
-    INITIAL_IP_RANGE: "20"
-    FINAL_IP_RANGE: "200"
-    DHCP_HOSTS:
-        52:54:00:CC:CC:03
-
-```
 
 # How to use
 
