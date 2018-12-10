@@ -559,7 +559,7 @@ func GetServiceForIronicApi(name string, namespace string) *v1.Service {
                     Name: "ironic-api",
                     Protocol: "TCP",
                     Port: 6385,
-                    NodePort: 32732,
+                    NodePort: 32733,
                 },
             },
         },

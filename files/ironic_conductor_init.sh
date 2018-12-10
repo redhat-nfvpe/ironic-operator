@@ -37,5 +37,5 @@ tftp_server = ${PXE_IP}
 http_url = http://${PXE_IP}:8081
 
 [conductor]
-api_url = http://${PXE_IP}:32732
+api_url = http://${PXE_IP}:32733
 EOF
