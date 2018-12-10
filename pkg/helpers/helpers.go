@@ -541,7 +541,7 @@ func GetPodNames(pods []v1.Pod) []string {
 
 // serviceForIronicApi returns a ironic-api Service object
 func GetServiceForIronicApi(name string, namespace string) *v1.Service {
-    srv_selector := map[string]string{"app": "ironic", "ironic_cr": "openstack-ironicapi"}
+    srv_selector := map[string]string{"app": "ironic", "ironic_cr": "openstack-ironic"}
     srv := &v1.Service{
         TypeMeta: metav1.TypeMeta{
             APIVersion: "core/v1",
@@ -584,7 +584,7 @@ func GetDbInitJob(namespace string, images map[string]string) *batchv1.Job {
         Spec: batchv1.JobSpec {
             Template: v1.PodTemplateSpec{
                 ObjectMeta: metav1.ObjectMeta {
-                    Labels: map[string]string {"app": "ironic", "ironicapi_cr": "openstack-ironicapi", "component": "db-init" },
+                    Labels: map[string]string {"app": "ironic", "ironic_cr": "openstack-ironic", "component": "db-init" },
                 },
                 Spec: v1.PodSpec {
                     NodeSelector: node_selector,
@@ -756,7 +756,7 @@ func GetDbSyncJob(namespace string, images map[string]string) *batchv1.Job {
         Spec: batchv1.JobSpec {
             Template: v1.PodTemplateSpec{
                 ObjectMeta: metav1.ObjectMeta {
-                    Labels: map[string]string {"app": "ironic", "ironicapi_cr": "openstack-ironicapi", "component": "db-sync" },
+                    Labels: map[string]string {"app": "ironic", "ironic_cr": "openstack-ironic", "component": "db-sync" },
                 },
                 Spec: v1.PodSpec {
                     NodeSelector: node_selector,
@@ -897,7 +897,7 @@ func GetRabbitInitJob(namespace string, images map[string]string) *batchv1.Job {
         Spec: batchv1.JobSpec {
             Template: v1.PodTemplateSpec{
                 ObjectMeta: metav1.ObjectMeta {
-                    Labels: map[string]string {"app": "ironic", "ironicapi_cr": "openstack-ironicapi", "component": "rabbit-init" },
+                    Labels: map[string]string {"app": "ironic", "ironic_cr": "openstack-ironic", "component": "rabbit-init" },
                 },
                 Spec: v1.PodSpec {
                     NodeSelector: node_selector,

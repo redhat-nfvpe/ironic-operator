@@ -9,9 +9,9 @@ Second thing is to setup the authentication. As we haven't installed Keystone, i
 ```sh
 export OS_TOKEN=fake-token
 ```
-The Ironic endpoint is set to the name `openstack-ironicapi`. If you ran the API command from a server inside the cluster, your DNS will have been automatically configured. Otherwise, you need to check for the matching IP of the Ironic API service, and configure your DNS properly. Then, export the endpoint:
+The Ironic endpoint is set to the name `openstack-ironic`. If you ran the API command from a server inside the cluster, your DNS will have been automatically configured. Otherwise, you need to check for the matching IP of the Ironic API service, and configure your DNS properly. Then, export the endpoint:
 ```sh
-export OS_URL=http://openstack-ironicapi:6385
+export OS_URL=http://openstack-ironic:6385
 ```
 Once authentication is done, you can proceed with direct or ramdisk deployment of baremetals.
 
