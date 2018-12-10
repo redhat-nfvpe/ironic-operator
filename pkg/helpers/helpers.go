@@ -315,13 +315,6 @@ func GetDeploymentForIronic(name string, namespace string, images map[string]str
                                     ContainerPort: 6385,
                                 },
                             },
-                            ReadinessProbe: &v1.Probe{
-                                Handler: v1.Handler{
-                                    TCPSocket: &v1.TCPSocketAction{
-                                        Port: intstr.FromInt(6385),
-                                    },
-                                },
-                            },
                             VolumeMounts: []v1.VolumeMount{
                                 {
                                     Name: "ironic-bin",
