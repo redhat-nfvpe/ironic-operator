@@ -44,5 +44,6 @@ rules:
   resources:
   - '*'
   - ironicconductors
+  - ironics
   verbs:
   - '*'

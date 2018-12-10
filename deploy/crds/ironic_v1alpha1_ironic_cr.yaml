@@ -1,7 +1,7 @@
 apiVersion: ironic.openstack.com/v1alpha1
-kind: IronicApi
+kind: Ironic
 metadata:
-  name: openstack-ironicapi
+  name: example-ironic
 spec:
   # Add fields here
-  size: 1
+  size: 3
