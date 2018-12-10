@@ -225,6 +225,7 @@ func GetDeploymentForIronic(name string, namespace string, images map[string]str
                     HostNetwork: true,
                     HostIPC: true,
                     DNSPolicy: "ClusterFirstWithHostNet",
+                    ShareProcessNamespace: &privTrue,
                     InitContainers: []v1.Container{
                         {
                             Image: images["KUBERNETES_ENTRYPOINT"],
@@ -513,28 +514,6 @@ func GetDeploymentForIronic(name string, namespace string, images map[string]str
                             Name: "pod-var-cache-ironic",
                             VolumeSource: v1.VolumeSource {
                                 EmptyDir: &v1.EmptyDirVolumeSource {},
-                            },
-                        },
-                        {
-                            Name: "ironic-bin",
-                            VolumeSource: v1.VolumeSource {
-                                ConfigMap: &v1.ConfigMapVolumeSource {
-                                    DefaultMode: &execMode,
-                                    LocalObjectReference: v1.LocalObjectReference {
-                                        Name: "ironic-bin",
-                                    },
-                                },
-                            },
-                        },
-                        {
-                            Name: "ironic-etc",
-                            VolumeSource: v1.VolumeSource {
-                                ConfigMap: &v1.ConfigMapVolumeSource {
-                                    DefaultMode: &readMode,
-                                    LocalObjectReference: v1.LocalObjectReference {
-                                        Name: "ironic-etc",
-                                    },
-                                },
                             },
                         },
                     },
