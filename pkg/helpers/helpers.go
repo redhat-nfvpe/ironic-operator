@@ -46,11 +46,7 @@ func GetIronicBinConfigMap(namespace string) (*v1.ConfigMap, error) {
     if err != nil {
         log.Fatal(err)
     }
-    ironic_api, err := box.FindString("ironic_api.sh")
-    if err != nil {
-        log.Fatal(err)
-    }
-    ironic_conductor, err := box.FindString("ironic_conductor.sh")
+    ironic_standalone, err := box.FindString("ironic_standalone.sh")
     if err != nil {
         log.Fatal(err)
     }
@@ -79,8 +75,7 @@ func GetIronicBinConfigMap(namespace string) (*v1.ConfigMap, error) {
             "db-init.py": db_init,
             "db-sync.sh": db_sync,
             "rabbit-init.sh": rabbit_init,
-            "ironic-api.sh": ironic_api,
-            "ironic-conductor.sh": ironic_conductor,
+            "ironic-standalone.sh": ironic_standalone,
             "ironic-conductor-init.sh": ironic_conductor_init,
             "ironic-conductor-pxe.sh": ironic_conductor_pxe,
             "ironic-conductor-pxe-init.sh": ironic_conductor_pxe_init,
