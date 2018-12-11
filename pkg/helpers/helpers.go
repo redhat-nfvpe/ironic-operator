@@ -299,14 +299,17 @@ func GetDeploymentForIronic(name string, namespace string, images map[string]str
                     },
                     Containers: []v1.Container{
                         {
-                            Image:   images["IRONIC_API"],
-                            Name:    "ironic-api",
+                            Name: "ironic-conductor",
+                            Image: images["IRONIC_CONDUCTOR"],
                             ImagePullPolicy: "IfNotPresent",
-                            Command: []string{"/tmp/ironic-api.sh", "start"},
+                            SecurityContext: &v1.SecurityContext {
+                                Privileged: &privTrue,
+                                RunAsUser: &rootUser,
+                            },
                             Lifecycle: &v1.Lifecycle{
                                 PreStop: &v1.Handler{
                                     Exec: &v1.ExecAction{
-                                        Command: []string{"/tmp/ironic-api.sh", "stop"},
+                                        Command: []string{"/tmp/ironic-standalone.sh", "stop"},
                                     },
                                 },
                             },
@@ -315,51 +318,12 @@ func GetDeploymentForIronic(name string, namespace string, images map[string]str
                                     ContainerPort: 6385,
                                 },
                             },
-                            VolumeMounts: []v1.VolumeMount{
-                                {
-                                    Name: "ironic-bin",
-                                    MountPath: "/tmp/ironic-api.sh",
-                                    SubPath: "ironic-api.sh",
-                                    ReadOnly: true,
-                                },
-                                {
-                                    Name: "ironic-etc",
-                                    MountPath: "/etc/ironic/ironic.conf",
-                                    SubPath: "ironic.conf",
-                                    ReadOnly: true,
-                                },
-                                {
-                                    Name: "ironic-etc",
-                                    MountPath: "/etc/ironic/logging.conf",
-                                    SubPath: "logging.conf",
-                                    ReadOnly: true,
-                                },
-                                {
-                                    Name: "ironic-etc",
-                                    MountPath: "/etc/ironic/policy.json",
-                                    SubPath: "policy.json",
-                                    ReadOnly: true,
-                                },
-                                {
-                                    Name: "pod-shared",
-                                    MountPath: "/tmp/pod-shared",
-                                },
-                            },
-                        },
-                        {
-                            Name: "ironic-conductor",
-                            Image: images["IRONIC_CONDUCTOR"],
-                            ImagePullPolicy: "IfNotPresent",
-                            SecurityContext: &v1.SecurityContext {
-                                Privileged: &privTrue,
-                                RunAsUser: &rootUser,
-                            },
-                            Command: []string { "/tmp/ironic-conductor.sh" },
+                            Command: []string { "/tmp/ironic-standalone.sh" },
                             VolumeMounts: []v1.VolumeMount {
                                 {
                                     Name: "ironic-bin",
-                                    MountPath: "/tmp/ironic-conductor.sh",
-                                    SubPath: "ironic-conductor.sh",
+                                    MountPath: "/tmp/ironic-standalone.sh",
+                                    SubPath: "ironic-standalone.sh",
                                     ReadOnly: true,
                                 },
                                 {
@@ -383,8 +347,18 @@ func GetDeploymentForIronic(name string, namespace string, images map[string]str
                                     ReadOnly: true,
                                 },
                                 {
+                                    Name: "ironic-etc",
+                                    MountPath: "/etc/ironic/policy.json",
+                                    SubPath: "policy.json",
+                                    ReadOnly: true,
+                                },
+                                {
                                     Name: "pod-data",
                                     MountPath: "/var/lib/pod_data",
+                                },
+                                {
+                                    Name: "pod-shared",
+                                    MountPath: "/tmp/pod-shared",
                                 },
                             },
                         },
@@ -585,7 +559,7 @@ func GetDbInitJob(namespace string, images map[string]string) *batchv1.Job {
                     Containers: []v1.Container {
                         {
                             Name: "ironic-db-init-0",
-                            Image: images["IRONIC_API"],
+                            Image: images["IRONIC_CONDUCTOR"],
                             ImagePullPolicy: "IfNotPresent",
                             Env: []v1.EnvVar {
                                 {
@@ -779,7 +753,7 @@ func GetDbSyncJob(namespace string, images map[string]string) *batchv1.Job {
                     Containers: []v1.Container {
                         {
                             Name: "ironic-db-sync",
-                            Image: images["IRONIC_API"],
+                            Image: images["IRONIC_CONDUCTOR"],
                             ImagePullPolicy: "IfNotPresent",
                             Command: []string { "/tmp/db-sync.sh" },
                             VolumeMounts: []v1.VolumeMount {

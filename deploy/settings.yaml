@@ -5,7 +5,6 @@ metadata:
     name: images
 data:
     KUBERNETES_ENTRYPOINT: "quay.io/stackanetes/kubernetes-entrypoint:v0.3.1"
-    IRONIC_API: "quay.io/yrobla/tripleorocky-centos-binary-ironic-api"
     IRONIC_CONDUCTOR: "quay.io/yrobla/tripleorocky-centos-binary-ironic-conductor"
     IRONIC_PXE: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo"
     NGINX: "docker.io/nginx:1.13.3"
