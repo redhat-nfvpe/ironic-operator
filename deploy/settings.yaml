@@ -5,10 +5,9 @@ metadata:
     name: images
 data:
     KUBERNETES_ENTRYPOINT: "quay.io/stackanetes/kubernetes-entrypoint:v0.3.1"
-    IRONIC_CONDUCTOR: "quay.io/yrobla/tripleorocky-centos-binary-ironic-conductor"
+    IRONIC_CONDUCTOR: "quay.io/yrobla/tripleorocky-centos-binary-ironic-conductor" # upgraded PyMySQL, applied https://review.openstack.org/#/c/623569/
     IRONIC_PXE: "docker.io/tripleorocky/centos-binary-ironic-pxe:current-tripleo"
     NGINX: "docker.io/nginx:1.13.3"
-    RABBIT_MANAGEMENT: "docker.io/rabbitmq:3.7-management"
 ---
 apiVersion: v1
 kind: ConfigMap

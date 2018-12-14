@@ -196,22 +196,6 @@ func (r *ReconcileIronic) Reconcile(request reconcile.Request) (reconcile.Result
         return reconcile.Result{}, err
     }
 
-    job_rabbit_init_found := &batchv1.Job{}
-    err = r.client.Get(context.TODO(), types.NamespacedName{Name: "ironic-rabbit-init", Namespace: instance.Namespace}, job_rabbit_init_found)
-    if err != nil && errors.IsNotFound(err) {
-        // define a new rabbit init job
-        job_rabbit_init := helpers.GetRabbitInitJob(instance.Namespace, cm_images.Data)
-        reqLogger.Info("Creating a new ironic-rabbit-init job", "Job.Namespace", job_rabbit_init.Namespace, "Job.Name", job_rabbit_init.Name)
-        err = r.client.Create(context.TODO(), job_rabbit_init)
-        if err != nil {
-            reqLogger.Error(err, "failed to create a new Job", "Job.Namespace", job_rabbit_init.Namespace, "Job.Name", job_rabbit_init.Name)
-            return reconcile.Result{}, err
-        }
-    } else if err != nil {
-        reqLogger.Error(err, "failed to get rabbit-init job")
-        return reconcile.Result{}, err
-    }
-
     // deploy DHCP only if needed
     dhcp_settings := &corev1.ConfigMap{}
     err = r.client.Get(context.TODO(), types.NamespacedName{Name: "dhcp-settings", Namespace: instance.Namespace}, dhcp_settings)

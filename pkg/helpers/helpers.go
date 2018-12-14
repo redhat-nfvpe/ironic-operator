@@ -42,10 +42,6 @@ func GetIronicBinConfigMap(namespace string) (*v1.ConfigMap, error) {
     if err != nil {
         log.Fatal(err)
     }
-    rabbit_init, err := box.FindString("rabbit_init.sh")
-    if err != nil {
-        log.Fatal(err)
-    }
     ironic_standalone, err := box.FindString("ironic_standalone.sh")
     if err != nil {
         log.Fatal(err)
@@ -74,7 +70,6 @@ func GetIronicBinConfigMap(namespace string) (*v1.ConfigMap, error) {
         Data: map[string]string{
             "db-init.py": db_init,
             "db-sync.sh": db_sync,
-            "rabbit-init.sh": rabbit_init,
             "ironic-standalone.sh": ironic_standalone,
             "ironic-conductor-init.sh": ironic_conductor_init,
             "ironic-conductor-pxe.sh": ironic_conductor_pxe,
@@ -105,12 +100,6 @@ func GetIronicEtcConfigMap(namespace string, client client.Client) (*v1.ConfigMa
     if err != nil {
         log.Fatal(err)
     }
-
-    // get rabbit secret
-    rabbit_secret := &v1.Secret{}
-    err = client.Get(context.TODO(), types.NamespacedName{Name: "ironic-rabbitmq-user", Namespace: namespace}, rabbit_secret)
-    ironic_conf = strings.Replace(ironic_conf, "##RABBIT_CONNECTION##", string(rabbit_secret.Data["RABBITMQ_TRANSPORT"]), -1)
-
 
     // get mysql secret
     mysql_secret := &v1.Secret{}
@@ -350,10 +339,6 @@ func GetDeploymentForIronic(name string, namespace string, images map[string]str
                                 {
                                     Name: "pod-data",
                                     MountPath: "/var/lib/pod_data",
-                                },
-                                {
-                                    Name: "pod-shared",
-                                    MountPath: "/tmp/pod-shared",
                                 },
                             },
                         },
@@ -842,88 +827,6 @@ func GetDHCPService(namespace string) *v1.Service {
     }
 
     return service
-}
-func GetRabbitInitJob(namespace string, images map[string]string) *batchv1.Job {
-    node_selector := map[string]string{"ironic-control-plane": "enabled"}
-    var execMode int32 = 0555
-
-    job := &batchv1.Job{
-        TypeMeta: metav1.TypeMeta{
-            APIVersion: "batch/v1",
-            Kind:       "Job",
-        },
-        ObjectMeta: metav1.ObjectMeta{
-            Name:      "ironic-rabbit-init",
-            Namespace: namespace,
-        },
-        Spec: batchv1.JobSpec {
-            Template: v1.PodTemplateSpec{
-                ObjectMeta: metav1.ObjectMeta {
-                    Labels: map[string]string {"app": "ironic", "ironic_cr": "openstack-ironic", "component": "rabbit-init" },
-                },
-                Spec: v1.PodSpec {
-                    NodeSelector: node_selector,
-                    RestartPolicy: "OnFailure",
-                    Containers: []v1.Container {
-                        {
-                            Name: "rabbit-init",
-                            Image: images["RABBIT_MANAGEMENT"],
-                            ImagePullPolicy: "IfNotPresent",
-                            Env: []v1.EnvVar {
-                                {
-                                    Name: "RABBITMQ_ADMIN_CONNECTION",
-                                    ValueFrom: &v1.EnvVarSource {
-                                        SecretKeyRef: &v1.SecretKeySelector {
-                                            LocalObjectReference: v1.LocalObjectReference {
-                                                Name: "ironic-rabbitmq-admin",
-                                            },
-                                            Key: "RABBITMQ_CONNECTION",
-                                        },
-                                    },
-                                },
-                                {
-                                    Name: "RABBITMQ_USER_CONNECTION",
-                                    ValueFrom: &v1.EnvVarSource {
-                                        SecretKeyRef: &v1.SecretKeySelector {
-                                            LocalObjectReference: v1.LocalObjectReference {
-                                                Name: "ironic-rabbitmq-user",
-                                            },
-                                            Key: "RABBITMQ_CONNECTION",
-                                        },
-                                    },
-                                },
-                            },
-                            Command: []string { "/tmp/rabbit-init.sh" },
-                            VolumeMounts: []v1.VolumeMount {
-                                {
-                                    Name: "rabbit-init-sh",
-                                    MountPath: "/tmp/rabbit-init.sh",
-                                    SubPath: "rabbit-init.sh",
-                                    ReadOnly: true,
-                                },
-                            },
-                        },
-                    },
-                    Volumes: []v1.Volume {
-
-                        {
-                            Name: "rabbit-init-sh",
-                            VolumeSource: v1.VolumeSource {
-                                ConfigMap: &v1.ConfigMapVolumeSource {
-                                    DefaultMode: &execMode,
-                                    LocalObjectReference: v1.LocalObjectReference {
-                                        Name: "ironic-bin",
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    }
-
-    return job
 }
 
 func GetDHCPDeployment(namespace string, images map[string]string) *appsv1.Deployment {
