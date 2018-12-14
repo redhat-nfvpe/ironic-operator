@@ -26,7 +26,14 @@ openstack baremetal node create --driver ipmi --driver-info ipmi_address=$NODE_I
 
 # TODO: properly retrieve generated node uuid
 export NODE_UUID=dummy_uuid
+export IMAGE_SUM=md5sum /path/to/rhcos-openstack.qcow2
+
 openstack baremetal port create $NODE_PXE_MAC --node $NODE_UUID
+openstack baremetal node set $NODE_UUID \
+    --instance-info image_source=http://$IMAGES_SERVER/rhcos-openstack.qcow2 \
+    --instance-info root_gb=20 \
+    --instance-info image_checksum=$IMAGE_SUM
+
 openstack baremetal node validate $NODE_UUID
 openstack baremetal node manage $NODE_UUID
 openstack baremetal node provide $NODE_UUID
