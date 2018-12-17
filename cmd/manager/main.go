@@ -8,8 +8,8 @@ import (
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
-	"github.com/redhat-nfvpe/ironic-operator/pkg/apis"
-	"github.com/redhat-nfvpe/ironic-operator/pkg/controller"
+	"github.com/metalkube/ironic-operator/pkg/apis"
+	"github.com/metalkube/ironic-operator/pkg/controller"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"

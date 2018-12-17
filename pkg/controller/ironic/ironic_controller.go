@@ -5,8 +5,8 @@ import (
     "reflect"
     "strconv"
 
-	ironicv1alpha1 "github.com/redhat-nfvpe/ironic-operator/pkg/apis/ironic/v1alpha1"
-    helpers "github.com/redhat-nfvpe/ironic-operator/pkg/helpers"
+	ironicv1alpha1 "github.com/metalkube/ironic-operator/pkg/apis/ironic/v1alpha1"
+    helpers "github.com/metalkube/ironic-operator/pkg/helpers"
 
     appsv1 "k8s.io/api/apps/v1"
     batchv1 "k8s.io/api/batch/v1"

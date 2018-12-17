@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/redhat-nfvpe/ironic-operator/pkg/controller/ironic"
+	"github.com/metalkube/ironic-operator/pkg/controller/ironic"
 )
 
 func init() {

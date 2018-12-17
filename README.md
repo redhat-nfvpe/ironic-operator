@@ -26,7 +26,7 @@ In order to successfully deploy Ironic, you will need several requirements:
   - TEMPORARY: If you are deploying on systems with selinux enabled, please set it to permissive. This won't be needed in the future
 
 # Installation
-Once you are in a cluster, clone the [Ironic] operator from [https://github.com/redhat-nfvpe/ironic-operator] . After that, you need to use the manifests on the deploy folder:
+Once you are in a cluster, clone the [Ironic] operator from [https://github.com/metalkube/ironic-operator] . After that, you need to use the manifests on the deploy folder:
 
 ```sh
 kubectl apply -f crds/ironic_v1alpha1_ironicapi_crd.yaml
@@ -99,5 +99,5 @@ Please follow the [How to use documentation]
 
 [Ironic]: <https://wiki.openstack.org/wiki/Ironic>
 [Kubernetes operators]: <https://github.com/operator-framework/operator-sdk>
-[https://github.com/redhat-nfvpe/ironic-operator]: <https://github.com/redhat-nfvpe/ironic-operator>
+[https://github.com/metalkube/ironic-operator]: <https://github.com/metalkube/ironic-operator>
 [How to use documentation]: <./docs/how-to-use.md>
