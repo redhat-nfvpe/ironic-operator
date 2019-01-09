@@ -46,7 +46,12 @@ subnet ${SUBNET} netmask 255.255.255.0 {
   if exists user-class and option user-class = "iPXE" {
       filename "http://${PXE_IP}:8081/boot.ipxe";
   } else {
-      filename "ipxe.efi";
+      if option client-arch != 00:00 {
+          filename "ipxe.efi";
+      } else {
+          filename "undionly.kpxe";
+      }
+
       next-server ${PXE_IP};
   }
 }
