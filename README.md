@@ -29,8 +29,7 @@ In order to successfully deploy Ironic, you will need several requirements:
 Once you are in a cluster, clone the [Ironic] operator from [https://github.com/metalkube/ironic-operator] . After that, you need to use the manifests on the deploy folder:
 
 ```sh
-kubectl apply -f crds/ironic_v1alpha1_ironicapi_crd.yaml
-kubectl apply -f crds/ironic_v1alpha1_ironicconductor_crd.yaml
+kubectl apply -f crds/ironic_v1alpha1_ironic_crd.yaml
 kubectl apply -f service_account.yaml
 kubectl apply -f role.yaml
 kubectl apply -f role_binding.yaml
@@ -38,8 +37,7 @@ kubectl apply -f operator.yaml
 kubectl apply -f credentials.yaml
 kubectl apply -f settings.yaml
 kubectl apply -f service_account.yaml
-kubectl apply -f crds/ironic_v1alpha1_ironicapi_cr.yaml
-kubectl apply -f crds/ironic_v1alpha1_ironicconductor_cr.yaml
+kubectl apply -f crds/ironic_v1alpha1_ironic_cr.yaml
 ```
 
 # Configuration
